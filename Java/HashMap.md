@@ -3,7 +3,7 @@
 
 
 
-HashMap内部数据结构
+### HashMap内部数据结构
 hashMap保存的是键值队<key, value>，key具有唯一性
 数组和链表/红黑树，数组初始大小为16，每次扩容是成倍扩容，即newCap = oldCap << 1
 
@@ -77,3 +77,6 @@ hashMap保存的是键值队<key, value>，key具有唯一性
         return null;
     }
 
+
+
+<https://yikun.github.io/2015/04/01/Java-HashMap%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E5%8F%8A%E5%AE%9E%E7%8E%B0/>
