@@ -1,0 +1,2 @@
+device\softwinner\common\hardware\audio
+hardware\libhardware
