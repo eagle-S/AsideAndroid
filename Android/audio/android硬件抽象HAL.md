@@ -380,7 +380,7 @@ static int load(const char *id,
 
 
 #### 获取hw_device_t
-在获取hw_module_t地址后，hw_module_t中函数指针地址也被初始化。在调用open函数时对hw_device_t进行赋值
+在获取hw_module_t地址后，hw_module_t中函数指针地址也被初始化。再调用open函数时对hw_device_t进行赋值
 
 ### 寻找hw_module_t首地址
 ```

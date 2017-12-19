@@ -490,7 +490,7 @@ audio.h中定义的音频模块名称
 #define AUDIO_HARDWARE_MODULE_ID_CODEC_OFFLOAD "codec_offload"
 ```
 
-
+加载流程如下:
 ```c
 status_t AudioPolicyManagerBase::loadAudioPolicyConfig(const char *path)
 {
@@ -517,6 +517,105 @@ status_t AudioPolicyManagerBase::loadAudioPolicyConfig(const char *path)
 }
 
 ```
+
+##### 初始化各种音频流对应的音量调节点
+
+##### 加载各audio硬件模块
+```c
+mHwModules[i]->mHandle = mpClientInterface->loadHwModule(mHwModules[i]->mName);
+```
+由之前对AudioPolicyCompatClient分析可知，此处loadHwModule实际是调用了AudioFlinger的loadHwModule
+```c
+audio_module_handle_t AudioFlinger::loadHwModule(const char *name)
+{
+    if (!settingsAllowed()) {
+        return 0;
+    }
+    Mutex::Autolock _l(mLock);
+    return loadHwModule_l(name);
+}
+
+// loadHwModule_l() must be called with AudioFlinger::mLock held
+audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
+{
+    for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
+        if (strncmp(mAudioHwDevs.valueAt(i)->moduleName(), name, strlen(name)) == 0) {
+            ALOGW("loadHwModule() module %s already loaded", name);
+            return mAudioHwDevs.keyAt(i);
+        }
+    }
+
+    audio_hw_device_t *dev;
+
+    int rc = load_audio_interface(name, &dev);
+    if (rc) {
+        ALOGI("loadHwModule() error %d loading module %s ", rc, name);
+        return 0;
+    }
+
+    mHardwareStatus = AUDIO_HW_INIT;
+    rc = dev->init_check(dev);
+    mHardwareStatus = AUDIO_HW_IDLE;
+    if (rc) {
+        ALOGI("loadHwModule() init check error %d for module %s ", rc, name);
+        return 0;
+    }
+
+    // Check and cache this HAL's level of support for master mute and master
+    // volume.  If this is the first HAL opened, and it supports the get
+    // methods, use the initial values provided by the HAL as the current
+    // master mute and volume settings.
+
+    AudioHwDevice::Flags flags = static_cast<AudioHwDevice::Flags>(0);
+    {  // scope for auto-lock pattern
+        AutoMutex lock(mHardwareLock);
+
+        if (0 == mAudioHwDevs.size()) {
+            mHardwareStatus = AUDIO_HW_GET_MASTER_VOLUME;
+            if (NULL != dev->get_master_volume) {
+                float mv;
+                if (OK == dev->get_master_volume(dev, &mv)) {
+                    mMasterVolume = mv;
+                }
+            }
+
+            mHardwareStatus = AUDIO_HW_GET_MASTER_MUTE;
+            if (NULL != dev->get_master_mute) {
+                bool mm;
+                if (OK == dev->get_master_mute(dev, &mm)) {
+                    mMasterMute = mm;
+                }
+            }
+        }
+
+        mHardwareStatus = AUDIO_HW_SET_MASTER_VOLUME;
+        if ((NULL != dev->set_master_volume) &&
+            (OK == dev->set_master_volume(dev, mMasterVolume))) {
+            flags = static_cast<AudioHwDevice::Flags>(flags |
+                    AudioHwDevice::AHWD_CAN_SET_MASTER_VOLUME);
+        }
+
+        mHardwareStatus = AUDIO_HW_SET_MASTER_MUTE;
+        if ((NULL != dev->set_master_mute) &&
+            (OK == dev->set_master_mute(dev, mMasterMute))) {
+            flags = static_cast<AudioHwDevice::Flags>(flags |
+                    AudioHwDevice::AHWD_CAN_SET_MASTER_MUTE);
+        }
+
+        mHardwareStatus = AUDIO_HW_IDLE;
+    }
+
+    audio_module_handle_t handle = nextUniqueId();
+    mAudioHwDevs.add(handle, new AudioHwDevice(name, dev, flags));
+
+    ALOGI("loadHwModule() Loaded %s audio interface from %s (%s) handle %d",
+          name, dev->common.module->name, dev->common.module->id, handle);
+
+    return handle;
+
+}
+```
+
 
 
 
