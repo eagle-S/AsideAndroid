@@ -1,3 +1,5 @@
+[TOC]
+
 ## 硬件抽象层 (HAL)
 ### HAL简介
 
@@ -16,92 +18,9 @@ Android的HAL是为了保护一些硬件提供商的知识产权而提出的，�
 
 为了保证 HAL 具有可预测的结构，每个特定于硬件的 HAL 接口都要具有 hardware/libhardware/include/hardware/hardware.h 中定义的属性。这类接口可让 Android 系统以一致的方式加载 HAL 模块的正确版本。HAL 接口包含两个组件：模块和设备。
 
+#### HAL模块
 ```c
-/*
- * Copyright (C) 2008 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-#ifndef ANDROID_INCLUDE_HARDWARE_HARDWARE_H
-#define ANDROID_INCLUDE_HARDWARE_HARDWARE_H
-
-#include <stdint.h>
-#include <sys/cdefs.h>
-
-#include <cutils/native_handle.h>
-#include <system/graphics.h>
-
-__BEGIN_DECLS
-
-/*
- * Value for the hw_module_t.tag field
- */
-
-#define MAKE_TAG_CONSTANT(A,B,C,D) (((A) << 24) | ((B) << 16) | ((C) << 8) | (D))
-
-#define HARDWARE_MODULE_TAG MAKE_TAG_CONSTANT('H', 'W', 'M', 'T')
-#define HARDWARE_DEVICE_TAG MAKE_TAG_CONSTANT('H', 'W', 'D', 'T')
-
-#define HARDWARE_MAKE_API_VERSION(maj,min) \
-            ((((maj) & 0xff) << 8) | ((min) & 0xff))
-
-#define HARDWARE_MAKE_API_VERSION_2(maj,min,hdr) \
-            ((((maj) & 0xff) << 24) | (((min) & 0xff) << 16) | ((hdr) & 0xffff))
-#define HARDWARE_API_VERSION_2_MAJ_MIN_MASK 0xffff0000
-#define HARDWARE_API_VERSION_2_HEADER_MASK  0x0000ffff
-
-
-/*
- * The current HAL API version.
- *
- * All module implementations must set the hw_module_t.hal_api_version field
- * to this value when declaring the module with HAL_MODULE_INFO_SYM.
- *
- * Note that previous implementations have always set this field to 0.
- * Therefore, libhardware HAL API will always consider versions 0.0 and 1.0
- * to be 100% binary compatible.
- *
- */
-#define HARDWARE_HAL_API_VERSION HARDWARE_MAKE_API_VERSION(1, 0)
-
-/*
- * Helper macros for module implementors.
- *
- * The derived modules should provide convenience macros for supported
- * versions so that implementations can explicitly specify module/device
- * versions at definition time.
- *
- * Use this macro to set the hw_module_t.module_api_version field.
- */
-#define HARDWARE_MODULE_API_VERSION(maj,min) HARDWARE_MAKE_API_VERSION(maj,min)
-#define HARDWARE_MODULE_API_VERSION_2(maj,min,hdr) HARDWARE_MAKE_API_VERSION_2(maj,min,hdr)
-
-/*
- * Use this macro to set the hw_device_t.version field
- */
-#define HARDWARE_DEVICE_API_VERSION(maj,min) HARDWARE_MAKE_API_VERSION(maj,min)
-#define HARDWARE_DEVICE_API_VERSION_2(maj,min,hdr) HARDWARE_MAKE_API_VERSION_2(maj,min,hdr)
-
-struct hw_module_t;
-struct hw_module_methods_t;
-struct hw_device_t;
-
-/**
- * Every hardware module must have a data structure named HAL_MODULE_INFO_SYM
- * and the fields of this data structure must begin with hw_module_t
- * followed by module specific information.
- */
+// hardware/libhardware/include/hardware/hardware.h 
 typedef struct hw_module_t {
     /** tag must be initialized to HARDWARE_MODULE_TAG */
     uint32_t tag;
@@ -167,13 +86,70 @@ typedef struct hw_module_t {
     uint32_t reserved[32-7];
 
 } hw_module_t;
+```
+表示模块的结构体 hw_module_t，其中包含：
+- tag 标签，值必须为HARDWARE_MODULE_TAG
+- version_major 主版本号
+- version_minor 次版本号
+- id   模块id
+- name  名称
+- author  作者
+- methods  结构体 hw_module_methods_t 的指针
 
+hw_module_t 结构体还包含指向另一个结构体 hw_module_methods_t 的指针，这个结构体中包含一个指向相应模块的 open 函数的指针。此 open 函数用于与相关硬件建立通信。
+```c
 typedef struct hw_module_methods_t {
     /** Open a specific device */
     int (*open)(const struct hw_module_t* module, const char* id,
             struct hw_device_t** device);
 
 } hw_module_methods_t;
+```
+
+实际使用中每个特定硬件的 HAL 通常都会使用附加信息为该特定硬件扩展通用的 hw_module_t 结构体。但必须保证hw_module_t处于此结体的第一个位置，即处于处于结构体的首地址的位置，在相机 HAL 中，camera_module_t 结构体会包含一个 hw_module_t 结构体以及其他特定于相机的函数指针：
+```c
+typedef struct camera_module {
+    hw_module_t common;
+    int (*get_number_of_cameras)(void);
+    int (*get_camera_info)(int camera_id, struct camera_info *info);
+} camera_module_t;
+```
+
+实现 HAL 并创建模块结构体时，必须将其命名为 HAL_MODULE_INFO_SYM， HAL_MODULE_INFO_SYM在hardware/libhardware/include/hardware/hardware.h中定义，此为寻找hw_module_t模块首地址标志。
+```c
+/**
+ * Name of the hal_module_info
+ */
+#define HAL_MODULE_INFO_SYM         HMI
+
+/**
+ * Name of the hal_module_info as a string
+ */
+#define HAL_MODULE_INFO_SYM_AS_STR  "HMI"
+```
+
+HAL模块定义举例：
+```c
+struct audio_module HAL_MODULE_INFO_SYM = {
+    .common = {
+        .tag = HARDWARE_MODULE_TAG,
+        .module_api_version = AUDIO_MODULE_API_VERSION_0_1,
+        .hal_api_version = HARDWARE_HAL_API_VERSION,
+        .id = AUDIO_HARDWARE_MODULE_ID,
+        .name = "NVIDIA Tegra Audio HAL",
+        .author = "The Android Open Source Project",
+        .methods = &hal_module_methods,
+    },
+};
+```
+
+#### HAL设备
+
+设备是产品硬件的抽象表示。例如，一个音频模块可能包含主音频设备、USB 音频设备或蓝牙 A2DP 音频设备。
+
+设备由 hw_device_t 结构体表示。
+```c
+// hardware/libhardware/include/hardware/hardware.h 
 
 /**
  * Every device data structure must begin with hw_device_t
@@ -211,76 +187,9 @@ typedef struct hw_device_t {
     int (*close)(struct hw_device_t* device);
 
 } hw_device_t;
-
-/**
- * Name of the hal_module_info
- */
-#define HAL_MODULE_INFO_SYM         HMI
-
-/**
- * Name of the hal_module_info as a string
- */
-#define HAL_MODULE_INFO_SYM_AS_STR  "HMI"
-
-/**
- * Get the module info associated with a module by id.
- *
- * @return: 0 == success, <0 == error and *module == NULL
- */
-int hw_get_module(const char *id, const struct hw_module_t **module);
-
-/**
- * Get the module info associated with a module instance by class 'class_id'
- * and instance 'inst'.
- *
- * Some modules types necessitate multiple instances. For example audio supports
- * multiple concurrent interfaces and thus 'audio' is the module class
- * and 'primary' or 'a2dp' are module interfaces. This implies that the files
- * providing these modules would be named audio.primary.<variant>.so and
- * audio.a2dp.<variant>.so
- *
- * @return: 0 == success, <0 == error and *module == NULL
- */
-int hw_get_module_by_class(const char *class_id, const char *inst,
-                           const struct hw_module_t **module);
-
-__END_DECLS
-
-#endif  /* ANDROID_INCLUDE_HARDWARE_HARDWARE_H */
 ```
 
-#### HAL模块
-表示模块的结构体 hw_module_t，其中包含模块的版本、名称和作者等元数据。Android 会根据这些元数据来找到并正确加载 HAL 模块。
-
-hw_module_t 结构体还包含指向另一个结构体 hw_module_methods_t 的指针，这个结构体中包含一个指向相应模块的 open 函数的指针。此 open 函数用于与相关硬件建立通信。
-每个特定硬件的 HAL 通常都会使用附加信息为该特定硬件扩展通用的 hw_module_t 结构体。但必须保证hw_module_t处于此结体的第一个位置，即处于处于结构体的首地址的位置，在相机 HAL 中，camera_module_t 结构体会包含一个 hw_module_t 结构体以及其他特定于相机的函数指针：
-```c
-typedef struct camera_module {
-    hw_module_t common;
-    int (*get_number_of_cameras)(void);
-    int (*get_camera_info)(int camera_id, struct camera_info *info);
-} camera_module_t;
-```
-
-实现 HAL 并创建模块结构体时，您必须将其命名为 HAL_MODULE_INFO_SYM。
-```c
-struct audio_module HAL_MODULE_INFO_SYM = {
-    .common = {
-        .tag = HARDWARE_MODULE_TAG,
-        .module_api_version = AUDIO_MODULE_API_VERSION_0_1,
-        .hal_api_version = HARDWARE_HAL_API_VERSION,
-        .id = AUDIO_HARDWARE_MODULE_ID,
-        .name = "NVIDIA Tegra Audio HAL",
-        .author = "The Android Open Source Project",
-        .methods = &hal_module_methods,
-    },
-};
-```
-
-#### HAL设备
-设备是产品硬件的抽象表示。例如，一个音频模块可能包含主音频设备、USB 音频设备或蓝牙 A2DP 音频设备。
-
-设备由 hw_device_t 结构体表示。与模块类似，每类设备都定义了一个通用 hw_device_t 的详细版本，其中包含指向硬件特定功能的函数指针。例如，audio_hw_device_t 结构体类型会包含指向音频设备操作的函数指针：
+与模块类似，实际使用中每类设备都定义了一个通用 hw_device_t 的详细版本，其中包含指向硬件特定功能的函数指针。例如，audio_hw_device_t 结构体类型会包含指向音频设备操作的函数指针：
 
 ```c
 struct audio_hw_device {
@@ -298,68 +207,15 @@ struct audio_hw_device {
 typedef struct audio_hw_device audio_hw_device_t;
 ```
 
-hardware/libhardware/hardware.c
+### HAL加载
 
+HAL加载具体实现在hardware/libhardware/hardware.c文件中
 
-## 寻找so库对应的模块
+#### 加载HAL模块，获取hw_module_t
 
-
-Y:\kitkat_T3\android\frameworks\av\services\audioflinger\AudioPolicyService.cpp
-
- 在AudioPolicyService初始化时
-
+加载HAL模块使用hardware中hw_get_module或hw_get_module_by_class函数：
 ``` c
- AudioPolicyService::AudioPolicyService()
-    : BnAudioPolicyService() , mpAudioPolicyDev(NULL) , mpAudioPolicy(NULL)
-{
-    char value[PROPERTY_VALUE_MAX];
-    const struct hw_module_t *module;
-    int forced_val;
-    int rc;
-
-    Mutex::Autolock _l(mLock);
-
-    // start tone playback thread
-    mTonePlaybackThread = new AudioCommandThread(String8("ApmTone"), this);
-    // start audio commands thread
-    mAudioCommandThread = new AudioCommandThread(String8("ApmAudio"), this);
-    // start output activity command thread
-    mOutputCommandThread = new AudioCommandThread(String8("ApmOutput"), this);
-    /* instantiate the audio policy manager */
-    rc = hw_get_module(AUDIO_POLICY_HARDWARE_MODULE_ID, &module);
-    if (rc)
-        return;
-
-    rc = audio_policy_dev_open(module, &mpAudioPolicyDev);
-    ALOGE_IF(rc, "couldn't open audio policy device (%s)", strerror(-rc));
-    if (rc)
-        return;
-
-    rc = mpAudioPolicyDev->create_audio_policy(mpAudioPolicyDev, &aps_ops, this,
-                                               &mpAudioPolicy);
-    ALOGE_IF(rc, "couldn't create audio policy (%s)", strerror(-rc));
-    if (rc)
-        return;
-
-    rc = mpAudioPolicy->init_check(mpAudioPolicy);
-    ALOGE_IF(rc, "couldn't init_check the audio policy (%s)", strerror(-rc));
-    if (rc)
-        return;
-
-    ALOGI("Loaded audio policy from %s (%s)", module->name, module->id);
-
-    // load audio pre processing modules
-    if (access(AUDIO_EFFECT_VENDOR_CONFIG_FILE, R_OK) == 0) {
-        loadPreProcessorConfig(AUDIO_EFFECT_VENDOR_CONFIG_FILE);
-    } else if (access(AUDIO_EFFECT_DEFAULT_CONFIG_FILE, R_OK) == 0) {
-        loadPreProcessorConfig(AUDIO_EFFECT_DEFAULT_CONFIG_FILE);
-    }
-}
-```
-
-其中hw_get_module
-``` c
-Y:\kitkat_T3\android\hardware\libhardware\hardware.c
+// hardware/libhardware/hardware.c
 
 int hw_get_module(const char *id, const struct hw_module_t **module)
 {
@@ -421,7 +277,40 @@ int hw_get_module_by_class(const char *class_id, const char *inst,
 
     return status;
 }
+```
+1. 获取模块名称name，name由传入的参数char *class_id, char *inst组成，如果inst为null则name=class_id，否则name=class_id.inst
+2. 在特定目录下，查找变体so共享库，获取其路径path
 
+```c
+/** Base path of the hal modules */
+#define HAL_LIBRARY_PATH1 "/system/lib/hw"
+#define HAL_LIBRARY_PATH2 "/vendor/lib/hw"
+```
+so库查找路径有两个，且/vendor/lib/hw 优先级大于/system/lib/hw
+```c
+/**
+ * There are a set of variant filename for modules. The form of the filename
+ * is "<MODULE_ID>.variant.so" so for the led module the Dream variants 
+ * of base "ro.product.board", "ro.board.platform" and "ro.arch" would be:
+ *
+ * led.trout.so
+ * led.msm7k.so
+ * led.ARMV6.so
+ * led.default.so
+ */
+
+static const char *variant_keys[] = {
+    "ro.hardware",  /* This goes first so that it can pick up a different
+                       file on the emulator. */
+    "ro.product.board",
+    "ro.board.platform",
+    "ro.arch"
+};
+```
+每个模块可能有一系列变体名，变体名格式为<MODULE_ID>.variant.so，例如MODULE_ID=led时，变体名可能是led.trout.so、led.msm7k.so。变体值根据系统属性"ro.product.board", "ro.board.platform" and "ro.arch" 依次获取。如果这些属性获取不到值，则查找<MODULE_ID>.default.so
+
+查找路径及变体so库名称最终组装成path，传入到load函数中
+```c
 /**
  * Load the file defined by the variant and if successful
  * return the dlopen handle and the hmi.
@@ -486,58 +375,58 @@ static int load(const char *id,
     return status;
 }
 ```
-
-/** Base path of the hal modules */
-#define HAL_LIBRARY_PATH1 "/system/lib/hw"
-#define HAL_LIBRARY_PATH2 "/vendor/lib/hw"
+1. 调用handle = dlopen(path, RTLD_NOW)根据path路径打开so文件
+2. 调用hmi = (struct hw_module_t *)dlsym(handle, sym)，根据HAL_MODULE_INFO_SYM_AS_STR字符串"HMI"获取hw_module_t地址
 
 
-/**
- * There are a set of variant filename for modules. The form of the filename
- * is "<MODULE_ID>.variant.so" so for the led module the Dream variants 
- * of base "ro.product.board", "ro.board.platform" and "ro.arch" would be:
- *
- * led.trout.so
- * led.msm7k.so
- * led.ARMV6.so
- * led.default.so
- */
+#### 获取hw_device_t
+在获取hw_module_t地址后，hw_module_t中函数指针地址也被初始化。在调用open函数时对hw_device_t进行赋值
 
-static const char *variant_keys[] = {
-    "ro.hardware",  /* This goes first so that it can pick up a different
-                       file on the emulator. */
-    "ro.product.board",
-    "ro.board.platform",
-    "ro.arch"
-};
-
-会先后从/vendor/lib/hw、/system/lib/hw查找命名格式为<MODULE_ID>.variant.so库，
-其中MODULE_ID为硬件模块id，
-variant为从属性"ro.product.board", "ro.board.platform","ro.arch" 中获取，如果均获取失败则获取<MODULE_ID>.default.so
-
-获取到so后会，在加载so时查找“HMI”这个导出符号，并获取其地址。
-``` c
-    const char *sym = HAL_MODULE_INFO_SYM_AS_STR;
-    hmi = (struct hw_module_t *)dlsym(handle, sym);
+### 寻找hw_module_t首地址
 ```
-/**
- * Every hardware module must have a data structure named HAL_MODULE_INFO_SYM
- * and the fields of this data structure must begin with hw_module_t
- * followed by module specific information.
- */
+linux@ubuntu:~/eclair_2.1_farsight/out/target/product/fs100/system/lib/hw$ file led.default.so   
+led.default.so: ELF 32-bit LSB shared object, ARM, version 1 (SYSV), dynamically linked, stripped 
+```
+使用file命令查看so文件，会发现so是以ELF头开始的文件。
 
- /**
- * Name of the hal_module_info
- */
-#define HAL_MODULE_INFO_SYM         HMI
+ELF = Executable and Linkable Format，可执行连接格式，是UNIX系统实验室（USL）作为应用程序二进制接口（Application Binary Interface，ABI）而开发和发布的，扩展名为elf。它保存了路线图(road map)，描述了该文件的组织情况。sections保存着object 文件的信息，从连接角度看：包括指令，数据,符号表，重定位信息等等。
 
-/**
- * Name of the hal_module_info as a string
- */
-#define HAL_MODULE_INFO_SYM_AS_STR  "HMI"
+可以使用readelf命令进一步查看相应的符号信息
+```
+linux@ubuntu:~/eclair_2.1_farsight/out/target/product/fs100/system/lib/hw$ readelf -s led.default.so 
 
+Symbol table '.dynsym' contains 25 entries:
+   Num:    Value  Size Type    Bind   Vis      Ndx Name
+     0: 00000000     0 NOTYPE  LOCAL  DEFAULT  UND 
+     1: 000004c8     0 SECTION LOCAL  DEFAULT    7 
+     2: 00001000     0 SECTION LOCAL  DEFAULT   11 
+     3: 00000000     0 FUNC    GLOBAL DEFAULT  UND ioctl
+     4: 000006d4     0 NOTYPE  GLOBAL DEFAULT  ABS __exidx_end
+     5: 00000000     0 FUNC    GLOBAL DEFAULT  UND __aeabi_unwind_cpp_pr0
+     6: 00001178     0 NOTYPE  GLOBAL DEFAULT  ABS _bss_end__
+     7: 00000000     0 FUNC    GLOBAL DEFAULT  UND malloc
+     8: 00001174     0 NOTYPE  GLOBAL DEFAULT  ABS __bss_start__
+     9: 00000000     0 FUNC    GLOBAL DEFAULT  UND __android_log_print
+    10: 000006ab     0 NOTYPE  GLOBAL DEFAULT  ABS __exidx_start
+    11: 00001174     4 OBJECT  GLOBAL DEFAULT   15 fd
+    12: 000005d5    60 FUNC    GLOBAL DEFAULT    7 led_set_off
+    13: 00001178     0 NOTYPE  GLOBAL DEFAULT  ABS __bss_end__
+    14: 00001174     0 NOTYPE  GLOBAL DEFAULT  ABS __bss_start
+    15: 00000000     0 FUNC    GLOBAL DEFAULT  UND memset
+    16: 00001178     0 NOTYPE  GLOBAL DEFAULT  ABS __end__
+    17: 00001174     0 NOTYPE  GLOBAL DEFAULT  ABS _edata
+    18: 00001178     0 NOTYPE  GLOBAL DEFAULT  ABS _end
+    19: 00000000     0 FUNC    GLOBAL DEFAULT  UND open
+    20: 00080000     0 NOTYPE  GLOBAL DEFAULT  ABS _stack
+    21: 00001000   128 OBJECT  GLOBAL DEFAULT   11 HMI
+    22: 00001170     0 NOTYPE  GLOBAL DEFAULT   14 __data_start
+    23: 00000000     0 FUNC    GLOBAL DEFAULT  UND close
+    24: 00000000     0 FUNC    GLOBAL DEFAULT  UND free
+```
+在21行我们发现，名字就是“HMI”，对应于hw_module_t结构体。
 
- android硬件抽象层规定，每个硬件模块必须有一个名为HAL_MODULE_INFO_SYM的结构体，HAL_MODULE_INFO_SYM其实是个宏在hardware.h 中定义#define HAL_MODULE_INFO_SYM   HMI，并且结构体第一个成员地址必须是hw_module_t的结构体
+所以在定义硬件模块时必须使用HAL_MODULE_INFO_SYM为变量名，这样编译器才会将这个结构体的导出符号变为“HMI”，这样这个结构体才能被dlsym函数找到！
+
 
 
 参考：
@@ -556,7 +445,4 @@ http://blog.csdn.net/myarrow/article/details/7175204
 
 Android HAL的被调用流程
 http://blog.csdn.net/myarrow/article/details/7175714
-
-
-
 

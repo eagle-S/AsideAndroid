@@ -388,6 +388,110 @@ AudioPolicyManagerBase对象构造过程中主要完成以下几个步骤：
 
 ##### 加载audio_policy.conf配置文件
 ```c
+#define AUDIO_POLICY_CONFIG_FILE "/system/etc/audio_policy.conf"
+#define AUDIO_POLICY_VENDOR_CONFIG_FILE "/vendor/etc/audio_policy.conf"
+
+if (loadAudioPolicyConfig(AUDIO_POLICY_VENDOR_CONFIG_FILE) != NO_ERROR) {
+        if (loadAudioPolicyConfig(AUDIO_POLICY_CONFIG_FILE) != NO_ERROR) {
+            ALOGE("could not load audio policy configuration file, setting defaults");
+            defaultAudioPolicyConfig();
+        }
+    }
+```
+audio_policy.conf优先加载/vendor/etc/audio_policy.conf，如果加载失败再加载/system/etc/audio_policy.conf，如果均加载失败则会加载一个默认的HwModule，并命名为primary module，从这可以看出，音频系统中一定必须存在的module就是primary了。
+
+##### audio_policy.conf介绍
+/system/etc/audio_policy.conf文件开头有对此文件介绍
+```
+# Global configuration section: lists input and output devices always present on the device
+# as well as the output device selected by default.
+# Devices are designated by a string that corresponds to the enum in audio.h
+
+全局配置部分：列出了设备上总是存在的输入输出设备，同时指定了系统默认选择的输出设备。这里的设备必须是audio.h中列出的枚举类型
+
+global_configuration {
+  attached_output_devices AUDIO_DEVICE_OUT_EARPIECE|AUDIO_DEVICE_OUT_SPEAKER
+  default_output_device AUDIO_DEVICE_OUT_SPEAKER
+  attached_input_devices AUDIO_DEVICE_IN_BUILTIN_MIC|AUDIO_DEVICE_IN_BACK_MIC|AUDIO_DEVICE_IN_REMOTE_SUBMIX|AUDIO_DEVICE_IN_FM_RX|AUDIO_DEVICE_IN_FM_RX_A2DP|AUDIO_DEVICE_IN_VOICE_CALL
+}
+
+# audio hardware module section: contains descriptors for all audio hw modules present on the
+# device. Each hw module node is named after the corresponding hw module library base name.
+# For instance, "primary" corresponds to audio.primary.<device>.so.
+# The "primary" module is mandatory and must include at least one output with
+# AUDIO_OUTPUT_FLAG_PRIMARY flag.
+# Each module descriptor contains one or more output profile descriptors and zero or more
+# input profile descriptors. Each profile lists all the parameters supported by a given output
+# or input stream category.
+# The "channel_masks", "formats", "devices" and "flags" are specified using strings corresponding
+# to enums in audio.h and audio_policy.h. They are concatenated by use of "|" without space or "\n".
+
+音频硬件模块部分：包含了机器中所有存在的音频硬件模块的描述，每一个硬件模块节点的名称必须与音频模块共享库so的名称相对应，例如："primary"与audio.primary.<device>.so库相对应。其中"primary"模块是强制需要的，并且它必须包含一个以AUDIO_OUTPUT_FLAG_PRIMARY作为flag的output。每个模块描述中包含一个或多个output输入配置描述，零个或多个input输入配置描述。每一个配置列举了输入输出流类型支持的参数，其中的 "channel_masks"、"formats"、"devices"和"flags"必须为audio.h、audio_policy.h中定义的枚举值，它们可以通过|连接，但不能包含空格和"\n"。
+```
+
+在代码中每种音频硬件模块被抽象成HwModule
+```c
+// hardware/libhardware_legacy/include/hardware_legacy/AudioPolicyManagerBase.h
+class HwModule {
+        public:
+                    HwModule(const char *name);
+                    ~HwModule();
+
+            void dump(int fd);
+
+            const char *const mName; // base name of the audio HW module (primary, a2dp ...)
+            audio_module_handle_t mHandle;
+            Vector <IOProfile *> mOutputProfiles; // output profiles exposed by this module
+            Vector <IOProfile *> mInputProfiles;  // input profiles exposed by this module
+        };
+
+        // the IOProfile class describes the capabilities of an output or input stream.
+        // It is currently assumed that all combination of listed parameters are supported.
+        // It is used by the policy manager to determine if an output or input is suitable for
+        // a given use case,  open/close it accordingly and connect/disconnect audio tracks
+        // to/from it.
+        class IOProfile
+        {
+        public:
+            IOProfile(HwModule *module);
+            ~IOProfile();
+
+            bool isCompatibleProfile(audio_devices_t device,
+                                     uint32_t samplingRate,
+                                     uint32_t format,
+                                     uint32_t channelMask,
+                                     audio_output_flags_t flags) const;
+
+            void dump(int fd);
+
+            // by convention, "0' in the first entry in mSamplingRates, mChannelMasks or mFormats
+            // indicates the supported parameters should be read from the output stream
+            // after it is opened for the first time
+            Vector <uint32_t> mSamplingRates; // supported sampling rates
+            Vector <audio_channel_mask_t> mChannelMasks; // supported channel masks
+            Vector <audio_format_t> mFormats; // supported audio formats
+            audio_devices_t mSupportedDevices; // supported devices (devices this output can be
+                                               // routed to)
+            audio_output_flags_t mFlags; // attribute flags (e.g primary output,
+                                                // direct output...). For outputs only.
+            HwModule *mModule;                     // audio HW module exposing this I/O stream
+        };
+```
+HwModule中包含了模块名称，输入、输入描述及int类型的mHandle
+
+audio.h中定义的音频模块名称
+```c
+// hardware/libhardware/include/hardware/audio.h
+
+#define AUDIO_HARDWARE_MODULE_ID_PRIMARY "primary"
+#define AUDIO_HARDWARE_MODULE_ID_A2DP "a2dp"
+#define AUDIO_HARDWARE_MODULE_ID_USB "usb"
+#define AUDIO_HARDWARE_MODULE_ID_REMOTE_SUBMIX "r_submix"
+#define AUDIO_HARDWARE_MODULE_ID_CODEC_OFFLOAD "codec_offload"
+```
+
+
+```c
 status_t AudioPolicyManagerBase::loadAudioPolicyConfig(const char *path)
 {
     cnode *root;
@@ -413,5 +517,6 @@ status_t AudioPolicyManagerBase::loadAudioPolicyConfig(const char *path)
 }
 
 ```
+
 
 

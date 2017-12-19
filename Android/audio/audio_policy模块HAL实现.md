@@ -1,12 +1,30 @@
 ### HAL结构体定义
-
-hardware/libhardware/include/hardware/audio_policy.h
 ```c
-/**
- * Every hardware module must have a data structure named HAL_MODULE_INFO_SYM
- * and the fields of this data structure must begin with hw_module_t
- * followed by module specific information.
- */
+// hardware/libhardware_legacy/audio/audio_policy_hal.cpp
+struct legacy_ap_module {
+    struct audio_policy_module module;
+};
+
+struct legacy_ap_device {
+    struct audio_policy_device device;
+};
+
+struct legacy_audio_policy {
+    struct audio_policy policy;
+
+    void *service;
+    struct audio_policy_service_ops *aps_ops;
+    AudioPolicyCompatClient *service_client;
+    AudioPolicyInterface *apm;
+};
+```
+- legacy_ap_module包含audio_policy_module
+- legacy_ap_device包含audio_policy_device
+
+
+audio_policy_module与audio_policy_device均在audio_policy.h中定义
+```c
+// hardware/libhardware/include/hardware/audio_policy.h
 typedef struct audio_policy_module {
     struct hw_module_t common;
 } audio_policy_module_t;
@@ -41,64 +59,9 @@ static inline int audio_policy_dev_close(struct audio_policy_device* device)
 定义结构体audio_policy_device 包含 hw_device_t
 定义打开、关闭函数audio_policy_dev_open、audio_policy_dev_close
 
-### HAL结构体初始化
-hardware/libhardware/modules/audio/audio_policy.c
+### 初始化
 ```c
-struct default_ap_module {
-    struct audio_policy_module module;
-};
-
-struct default_ap_device {
-    struct audio_policy_device device;
-};
-
-struct default_audio_policy {
-    struct audio_policy policy;
-
-    struct audio_policy_service_ops *aps_ops;
-    void *service;
-};
-
-static struct hw_module_methods_t default_ap_module_methods = {
-    .open = default_ap_dev_open,
-};
-
-struct default_ap_module HAL_MODULE_INFO_SYM = {
-    .module = {
-        .common = {
-            .tag            = HARDWARE_MODULE_TAG,
-            .version_major  = 1,
-            .version_minor  = 0,
-            .id             = AUDIO_POLICY_HARDWARE_MODULE_ID,
-            .name           = "Default audio policy HAL",
-            .author         = "The Android Open Source Project",
-            .methods        = &default_ap_module_methods,
-        },
-    },
-};
-```
-初始化结构体default_ap_module HAL_MODULE_INFO_SYM，并将default_ap_module_methods地址赋值给methods
-
-
-hardware/libhardware_legacy/audio/audio_policy_hal.cpp
-```c
-struct legacy_ap_module {
-    struct audio_policy_module module;
-};
-
-struct legacy_ap_device {
-    struct audio_policy_device device;
-};
-
-struct legacy_audio_policy {
-    struct audio_policy policy;
-
-    void *service;
-    struct audio_policy_service_ops *aps_ops;
-    AudioPolicyCompatClient *service_client;
-    AudioPolicyInterface *apm;
-};
-
+// hardware/libhardware_legacy/audio/audio_policy_hal.cpp
 static struct hw_module_methods_t legacy_ap_module_methods = {
         open: legacy_ap_dev_open
 };
@@ -136,10 +99,6 @@ frameworks/av/services/audioflinger/AudioPolicyService.cpp中构造函数AudioPo
     rc = mpAudioPolicyDev->create_audio_policy(mpAudioPolicyDev, &aps_ops, this,
                                                &mpAudioPolicy);
 ```
-1. 获取模块hw_module_t
-2. 调用open函数初始化hw_device_t及其他接口
-3. 调用create_audio_policy初始化audio_policy
-
-总结：
-1. 调用hardware.h中 hw_get_module或hw_get_module_by_class函数初始化hw_module_t
-2. 调用hw_module_t中open函数初始化audio_policy_device结构体，其中包含初始化hw_device_t及其他接口
+1. 通过hw_get_module函数加载so库，获取模块hw_module_t
+2. 调用模块hw_module_t中hw_module_methods_t的open函数即module->methods->open，初始化hw_device_t及其他接口
+3. 调用设备hw_device_t中create_audio_policy初始化audio_policy
