@@ -1,3 +1,5 @@
+[TOC]
+
 ## 简介
 AudioPolicyService处于本地媒体服务层，提供音频策略服务，比如什么时候打开音频接口设备、某种Stream类型的音频对应什么设备等等。
 
@@ -46,7 +48,9 @@ public:
 ```
 instantiate函数的实现可以看出，向ServiceManager注册的服务，服务名根据getServiceName()获取，服务使用无参数构造函数进行初始化。
 
-AudioPolicyService实现，如下：
+##AudioPolicyService初始化
+
+AudioPolicyService初始化实现，如下：
 ```c
 static const char *getServiceName() ANDROID_API { return "media.audio_policy"; }
 
@@ -107,8 +111,11 @@ AudioPolicyService::AudioPolicyService()
 ### 创建AudioCommandThread线程
 
 
+### 获取legacy_ap_module
+详见
 
-
+### 加载legacy_ap_device
+详见
 
 ### 创建legacy_audio_policy
 通过调用上一步得到的legacy_ap_device结构体的函数指针创建legacy_audio_policy
@@ -116,7 +123,7 @@ AudioPolicyService::AudioPolicyService()
 mpAudioPolicyDev->create_audio_policy(mpAudioPolicyDev, &aps_ops, this,
                                                &mpAudioPolicy);
 ```
-以上传入的
+以上传入的aps_ops
 
 
 
@@ -520,6 +527,10 @@ status_t AudioPolicyManagerBase::loadAudioPolicyConfig(const char *path)
 
 ##### 初始化各种音频流对应的音量调节点
 
+待续
+
+
+
 ##### 加载各audio硬件模块
 ```c
 mHwModules[i]->mHandle = mpClientInterface->loadHwModule(mHwModules[i]->mName);
@@ -615,7 +626,184 @@ audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
 
 }
 ```
+此函数主要做了一下事情：
+1. 函数首先加载系统定义的音频接口对应的so库，并打开该音频接口的抽象硬件设备audio_hw_device_t
+2. 设置音频模块主音量
+3. 为每个音频接口设备生成独一无二的ID号，同时将打开的音频接口设备封装为AudioHwDevice对象，将系统中所有的音频接口设备保存到AudioFlinger的成员变量mAudioHwDevs中。
 
+此函数返回了音频设备唯一id，赋值给AudioPolicyManagerBase中的mHwModules，这样使得配置项与每个设备接口真正的对应了起来
+mHwModules[i]->mHandle = mpClientInterface->loadHwModule(mHwModules[i]->mName);
+
+
+load_audio_interface加载各音频模块，初始化audio_hw_device_t
+```c
+static int load_audio_interface(const char *if_name, audio_hw_device_t **dev)
+{
+    const hw_module_t *mod;
+    int rc;
+
+    rc = hw_get_module_by_class(AUDIO_HARDWARE_MODULE_ID, if_name, &mod);
+    ALOGE_IF(rc, "%s couldn't load audio hw module %s.%s (%s)", __func__,
+                 AUDIO_HARDWARE_MODULE_ID, if_name, strerror(-rc));
+    if (rc) {
+        goto out;
+    }
+    rc = audio_hw_device_open(mod, dev);
+    ALOGE_IF(rc, "%s couldn't open audio hw device in %s.%s (%s)", __func__,
+                 AUDIO_HARDWARE_MODULE_ID, if_name, strerror(-rc));
+    if (rc) {
+        goto out;
+    }
+    if ((*dev)->common.version != AUDIO_DEVICE_API_VERSION_CURRENT) {
+        ALOGE("%s wrong audio hw device version %04x", __func__, (*dev)->common.version);
+        rc = BAD_VALUE;
+        goto out;
+    }
+    return 0;
+
+out:
+    *dev = NULL;
+    return rc;
+}
+```
+此处加载各种音频设备与之前的一致。
+
+##### 打开attached_output_devices输出
+
+获取全局配置中attached_output_devices 配置的devices，与mHwModules中mOutputProfiles匹配，如果匹配到且outProfile->mFlags不为AUDIO_OUTPUT_FLAG_DIRECT时，将会打开输出
+
+打开输出：
+```c
+// hardware/libhardware_legacy/audio/AudioPolicyManagerBase.cpp
+    audio_io_handle_t output = mpClientInterface->openOutput(
+                                    outProfile->mModule->mHandle,
+                                    &outputDesc->mDevice,
+                                    &outputDesc->mSamplingRate,
+                                    &outputDesc->mFormat,
+                                    &outputDesc->mChannelMask,
+                                    &outputDesc->mLatency,
+                                    outputDesc->mFlags);
+```
+最终调用到AudioFlinger.openOutput
+```c
+audio_io_handle_t AudioFlinger::openOutput(audio_module_handle_t module,
+                                           audio_devices_t *pDevices,
+                                           uint32_t *pSamplingRate,
+                                           audio_format_t *pFormat,
+                                           audio_channel_mask_t *pChannelMask,
+                                           uint32_t *pLatencyMs,
+                                           audio_output_flags_t flags,
+                                           const audio_offload_info_t *offloadInfo)
+{
+    PlaybackThread *thread = NULL;
+    struct audio_config config;
+    config.sample_rate = (pSamplingRate != NULL) ? *pSamplingRate : 0;
+    config.channel_mask = (pChannelMask != NULL) ? *pChannelMask : 0;
+    config.format = (pFormat != NULL) ? *pFormat : AUDIO_FORMAT_DEFAULT;
+    if (offloadInfo) {
+        config.offload_info = *offloadInfo;
+    }
+
+    audio_stream_out_t *outStream = NULL;
+    AudioHwDevice *outHwDev;
+
+    ALOGV("openOutput(), module %d Device %x, SamplingRate %d, Format %#08x, Channels %x, flags %x",
+              module,
+              (pDevices != NULL) ? *pDevices : 0,
+              config.sample_rate,
+              config.format,
+              config.channel_mask,
+              flags);
+    ALOGV("openOutput(), offloadInfo %p version 0x%04x",
+          offloadInfo, offloadInfo == NULL ? -1 : offloadInfo->version );
+
+    if (pDevices == NULL || *pDevices == 0) {
+        return 0;
+    }
+
+    Mutex::Autolock _l(mLock);
+
+    outHwDev = findSuitableHwDev_l(module, *pDevices);
+    if (outHwDev == NULL)
+        return 0;
+
+    audio_hw_device_t *hwDevHal = outHwDev->hwDevice();
+    audio_io_handle_t id = nextUniqueId();
+
+    mHardwareStatus = AUDIO_HW_OUTPUT_OPEN;
+
+    status_t status = hwDevHal->open_output_stream(hwDevHal,
+                                          id,
+                                          *pDevices,
+                                          (audio_output_flags_t)flags,
+                                          &config,
+                                          &outStream);
+
+    mHardwareStatus = AUDIO_HW_IDLE;
+    ALOGV("openOutput() openOutputStream returned output %p, SamplingRate %d, Format %#08x, "
+            "Channels %x, status %d",
+            outStream,
+            config.sample_rate,
+            config.format,
+            config.channel_mask,
+            status);
+
+    if (status == NO_ERROR && outStream != NULL) {
+        AudioStreamOut *output = new AudioStreamOut(outHwDev, outStream, flags);
+
+        if (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) {
+            thread = new OffloadThread(this, output, id, *pDevices);
+            ALOGV("openOutput() created offload output: ID %d thread %p", id, thread);
+        } else if ((flags & AUDIO_OUTPUT_FLAG_DIRECT) ||
+            (config.format != AUDIO_FORMAT_PCM_16_BIT) ||
+            (config.channel_mask != AUDIO_CHANNEL_OUT_STEREO)) {
+            thread = new DirectOutputThread(this, output, id, *pDevices);
+            ALOGV("openOutput() created direct output: ID %d thread %p", id, thread);
+        } else {
+            thread = new MixerThread(this, output, id, *pDevices);
+            ALOGV("openOutput() created mixer output: ID %d thread %p", id, thread);
+        }
+        mPlaybackThreads.add(id, thread);
+
+        if (pSamplingRate != NULL) {
+            *pSamplingRate = config.sample_rate;
+        }
+        if (pFormat != NULL) {
+            *pFormat = config.format;
+        }
+        if (pChannelMask != NULL) {
+            *pChannelMask = config.channel_mask;
+        }
+        if (pLatencyMs != NULL) {
+            *pLatencyMs = thread->latency();
+        }
+
+        // notify client processes of the new output creation
+        thread->audioConfigChanged_l(AudioSystem::OUTPUT_OPENED);
+
+        // the first primary output opened designates the primary hw device
+        if ((mPrimaryHardwareDev == NULL) && (flags & AUDIO_OUTPUT_FLAG_PRIMARY)) {
+            ALOGI("Using module %d has the primary audio interface", module);
+            mPrimaryHardwareDev = outHwDev;
+
+            AutoMutex lock(mHardwareLock);
+            mHardwareStatus = AUDIO_HW_SET_MODE;
+            hwDevHal->set_mode(hwDevHal, mMode);
+            mHardwareStatus = AUDIO_HW_IDLE;
+        }
+        return id;
+    }
+
+    return 0;
+} 
+```
+1. 查找对应的音频接口设备audio_hw_device_t
+2. 初始化音频输出流对象audio_stream_out_t
+3. 将AudioHwDevice及audio_stream_out_t封装成AudioStreamOut
+4. 根据不同类型flags创建PlaybackThread
+5. 给每个thread对应一个唯一id缓存下来mPlaybackThreads.add(id, thread);
+
+##### 保存输出设备描述符对象
 
 
 
