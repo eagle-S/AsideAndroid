@@ -13,8 +13,6 @@ hardware/libhardware/include/hardware/gps.h
 device/softwinner/t3-common/hardware/gps/gps.c
 
 
-
-
 ### LocationManagerService启动
 ```java
 // frameworks/base/services/java/com/android/server/SystemServer.java
@@ -96,11 +94,11 @@ static void android_location_GpsLocationProvider_class_init_native(JNIEnv* env, 
 ```
 初始化函数主要做了两件事：
 1. 获取java层函数，供后续回调
-2. 初始化gps hal接口
+2. 初始化gps hal模块，获取GpsInterface
 
 #### gps HAL接口介绍
 
-##### gps_device_t
+##### hw_module_t/gps_device_t初始化
 ```c
 // hardware/libhardware/include/hardware/gps.h
 struct gps_device_t {
@@ -195,7 +193,6 @@ static const GpsInterface  serialGpsInterface = {
     serial_gps_get_extension,
 };
 
-
 const GpsInterface* gps_get_hardware_interface()
 {
     D("GPS dev get_hardware_interface");
@@ -204,16 +201,223 @@ const GpsInterface* gps_get_hardware_interface()
 ```
 serialGpsInterface将GpsInterface接口与类中的函数对应起来了。
 
-### LocationManagerService初始化
-```java
-```
+
+从以上逻辑看出，class_init_native函数初始化gps hal模块，并通过函数gps_get_hardware_interface获取到了gps接口GpsInterface
 
 
 ### 设置监听
+在ActivityManagerService.self().systemReady回调中，将会调用LocationManagerService.systemRunning()初始化一些状态
+```java
+// frameworks/base/services/java/com/android/server/SystemServer.java
+    try {
+        if (locationF != null) locationF.systemRunning();
+    } catch (Throwable e) {
+        reportWtf("Notifying Location Service running", e);
+    }
+```
 
+LocationManagerService.systemRunning()实现：
+```java
+// frameworks/base/services/java/com/android/server/LocationManagerService.java
+    public void systemRunning() {
+        synchronized (mLock) {
+            if (D) Log.d(TAG, "systemReady()");
+
+            // fetch package manager
+            mPackageManager = mContext.getPackageManager();
+
+            // fetch power manager
+            mPowerManager = (PowerManager) mContext.getSystemService(Context.POWER_SERVICE);
+
+            // prepare worker thread
+            mLocationHandler = new LocationWorkerHandler(BackgroundThread.get().getLooper());
+
+            // prepare mLocationHandler's dependents
+            mLocationFudger = new LocationFudger(mContext, mLocationHandler);
+            mBlacklist = new LocationBlacklist(mContext, mLocationHandler);
+            mBlacklist.init();
+            mGeofenceManager = new GeofenceManager(mContext, mBlacklist);
+
+            // Monitor for app ops mode changes.
+            AppOpsManager.OnOpChangedListener callback
+                    = new AppOpsManager.OnOpChangedInternalListener() {
+                public void onOpChanged(int op, String packageName) {
+                    synchronized (mLock) {
+                        for (Receiver receiver : mReceivers.values()) {
+                            receiver.updateMonitoring(true);
+                        }
+                        applyAllProviderRequirementsLocked();
+                    }
+                }
+            };
+            mAppOps.startWatchingMode(AppOpsManager.OP_COARSE_LOCATION, null, callback);
+
+            // prepare providers
+            loadProvidersLocked();
+            updateProvidersLocked();
+        }
+
+        // listen for settings changes
+        mContext.getContentResolver().registerContentObserver(
+                Settings.Secure.getUriFor(Settings.Secure.LOCATION_PROVIDERS_ALLOWED), true,
+                new ContentObserver(mLocationHandler) {
+                    @Override
+                    public void onChange(boolean selfChange) {
+                        synchronized (mLock) {
+                            updateProvidersLocked();
+                        }
+                    }
+                }, UserHandle.USER_ALL);
+        mPackageMonitor.register(mContext, mLocationHandler.getLooper(), true);
+
+        // listen for user change
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(Intent.ACTION_USER_SWITCHED);
+
+        mContext.registerReceiverAsUser(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent.getAction();
+                if (Intent.ACTION_USER_SWITCHED.equals(action)) {
+                    switchUser(intent.getIntExtra(Intent.EXTRA_USER_HANDLE, 0));
+                }
+            }
+        }, UserHandle.ALL, intentFilter, null, mLocationHandler);
+    }
+```
+在loadProvidersLocked()函数中会初始化GpsLocationProvider，并将其缓存到mProviders中，updateProvidersLocked()函数会根据设置启用对应的LocationProvider。最终会通过GpsLocationProvider的enable()函数调用到native_init()。
+
+native_init()在JNI实现中对应android_location_GpsLocationProvider_init函数：
+```c
+// frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
+
+GpsCallbacks sGpsCallbacks = {
+    sizeof(GpsCallbacks),
+    location_callback,
+    status_callback,
+    sv_status_callback,
+    nmea_callback,
+    set_capabilities_callback,
+    acquire_wakelock_callback,
+    release_wakelock_callback,
+    create_thread_callback,
+    request_utc_time_callback,
+};
+
+static jboolean android_location_GpsLocationProvider_init(JNIEnv* env, jobject obj)
+{
+    // this must be set before calling into the HAL library
+    if (!mCallbacksObj)
+        mCallbacksObj = env->NewGlobalRef(obj);
+
+    // fail if the main interface fails to initialize
+    if (!sGpsInterface || sGpsInterface->init(&sGpsCallbacks) != 0)
+        return false;
+
+    // if XTRA initialization fails we will disable it by sGpsXtraInterface to NULL,
+    // but continue to allow the rest of the GPS interface to work.
+    if (sGpsXtraInterface && sGpsXtraInterface->init(&sGpsXtraCallbacks) != 0)
+        sGpsXtraInterface = NULL;
+    if (sAGpsInterface)
+        sAGpsInterface->init(&sAGpsCallbacks);
+    if (sGpsNiInterface)
+        sGpsNiInterface->init(&sGpsNiCallbacks);
+    if (sAGpsRilInterface)
+        sAGpsRilInterface->init(&sAGpsRilCallbacks);
+    if (sGpsGeofencingInterface)
+        sGpsGeofencingInterface->init(&sGpsGeofenceCallbacks);
+
+    return true;
+}
+```
+在上述实现中调用了GpsInterface->init函数，将GpsCallbacks赋值给GpsInterface，这样gps数据就能通过回调返回给上层应用。
+
+|  HAL   |     JNI                 |   java  |
+|--------|-------------------------|---------|
+|        |location_callback        |reportLocation|
+|        |status_callback          |reportStatus|
+|        |sv_status_callback       |reportSvStatus|
+|        |nmea_callback            |reportNmea|
+|        |set_capabilities_callback|setEngineCapabilities|
+|        |acquire_wakelock_callback|NA|
+|        |release_wakelock_callback|NA|
+|        |create_thread_callback   |NA|
+|        |request_utc_time_callback|requestUtcTime|
 
 
 ### 上报数据
+```c
+// device/softwinner/t3-common/hardware/gps/gps.c
+static int
+serial_gps_init(GpsCallbacks* callbacks)
+{
+    D("serial_gps_init");
+    GpsState*  s = _gps_state;
+
+    if (!s->init)
+        gps_state_init(s, callbacks);
+
+    if (s->fd < 0)
+        return -1;
+
+    return 0;
+}
+
+static void
+gps_state_init( GpsState*  state, GpsCallbacks* callbacks )
+{
+    char   prop[PROPERTY_VALUE_MAX];
+    char   baud[PROPERTY_VALUE_MAX];
+    char   device[256];
+    int    ret;
+    int    done = 0;
+
+    struct sigevent tmr_event;
+
+    state->init       = 1;
+    state->control[0] = -1;
+    state->control[1] = -1;
+    state->fd         = -1;
+    state->callbacks  = callbacks;
+    D("gps_state_init");
+
+    // Look for a kernel-provided device name
+    if (property_get("ro.kernel.android.gps",prop,"ttyS2") == 0) {
+        D("no kernel-provided gps device name");
+        return;
+    }
+
+	_gps_mLocation_p=&_gps_mLocation;
+    snprintf(device, sizeof(device), "/dev/%s",prop);
+    do {
+        state->fd = open( device, O_RDWR );
+    } while (state->fd < 0 && errno == EINTR);
+
+    if (state->fd < 0) {
+        ALOGE("could not open gps serial device %s: %s", device, strerror(errno) );
+        return;
+    }
+
+   ..........
+
+    state->thread = callbacks->create_thread_cb( "gps_state_thread", gps_state_thread, state );
+
+    if ( !state->thread ) {
+        ALOGE("Could not create GPS thread: %s", strerror(errno));
+        goto Fail;
+    }
+
+    D("GPS state initialized");
+
+    return;
+
+Fail:
+    gps_state_done( state );
+}
+```
+
+
+
 
 
 gps框架及简析
