@@ -1,6 +1,7 @@
 [TOC]
 
 ### 相关代码
+
 frameworks/base/location/java/android/location/LocationManager.java
 
 frameworks/base/location/java/android/location/IGpsStatusListener.aidl
@@ -12,8 +13,8 @@ frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
 hardware/libhardware/include/hardware/gps.h
 device/softwinner/t3-common/hardware/gps/gps.c
 
-
 ### LocationManagerService启动
+
 ```java
 // frameworks/base/services/java/com/android/server/SystemServer.java
     try {
@@ -24,10 +25,13 @@ device/softwinner/t3-common/hardware/gps/gps.c
         reportWtf("starting Location Manager", e);
     }
 ```
+
 LocationManagerService在SystemServer启动时加入到ServiceManager中，服务名称为location。
 
 ### GPS模块初始化
+
 LocationManagerService.java中导入了类GpsLocationProvider，GpsLocationProvider的static代码会被调用
+
 ```java
 // frameworks/base/services/java/com/android/server/location/GpsLocationProvider.java
 static { class_init_native(); }
@@ -36,6 +40,7 @@ private static native void class_init_native();
 ```
 
 看下JNI调用实现：
+
 ```c++
 // frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
 static void android_location_GpsLocationProvider_class_init_native(JNIEnv* env, jclass clazz) {
@@ -92,13 +97,16 @@ static void android_location_GpsLocationProvider_class_init_native(JNIEnv* env, 
     }
 }
 ```
+
 初始化函数主要做了两件事：
+
 1. 获取java层函数，供后续回调
 2. 初始化gps hal模块，获取GpsInterface
 
 #### gps HAL接口介绍
 
 ##### hw_module_t/gps_device_t初始化
+
 ```c
 // hardware/libhardware/include/hardware/gps.h
 struct gps_device_t {
@@ -112,6 +120,7 @@ struct gps_device_t {
     const GpsInterface* (*get_gps_interface)(struct gps_device_t* dev);
 };
 ```
+
 ```c
 // device/softwinner/t3-common/hardware/gps/gps.c
 static int open_gps(const struct hw_module_t* module, char const* name, struct hw_device_t** device)
@@ -143,18 +152,19 @@ struct hw_module_t HAL_MODULE_INFO_SYM = {
     .author = "Keith Conger",
     .methods = &gps_module_methods,
 };
-
 ```
+
 在结构体gps_device_t中提供了获取对外接口GpsInterface的方法get_gps_interface
 
 ##### GpsInterface声明及初始化
 
 GpsInterface声明
+
 ```c
 // hardware/libhardware/include/hardware/gps.h
 typedef struct {
     size_t          size;
-   
+
     int   (*init)( GpsCallbacks* callbacks );
 
     int   (*start)( void );
@@ -178,6 +188,7 @@ typedef struct {
 ```
 
 GpsInterface初始化
+
 ```c
 // device/softwinner/t3-common/hardware/gps/gps.c
 static const GpsInterface  serialGpsInterface = {
@@ -199,14 +210,15 @@ const GpsInterface* gps_get_hardware_interface()
     return &serialGpsInterface;
 }
 ```
-serialGpsInterface将GpsInterface接口与类中的函数对应起来了。
 
+serialGpsInterface将GpsInterface接口与类中的函数对应起来了。
 
 从以上逻辑看出，class_init_native函数初始化gps hal模块，并通过函数gps_get_hardware_interface获取到了gps接口GpsInterface
 
-
 ### 设置监听
+
 在ActivityManagerService.self().systemReady回调中，将会调用LocationManagerService.systemRunning()初始化一些状态
+
 ```java
 // frameworks/base/services/java/com/android/server/SystemServer.java
     try {
@@ -217,6 +229,7 @@ serialGpsInterface将GpsInterface接口与类中的函数对应起来了。
 ```
 
 LocationManagerService.systemRunning()实现：
+
 ```java
 // frameworks/base/services/java/com/android/server/LocationManagerService.java
     public void systemRunning() {
@@ -285,9 +298,11 @@ LocationManagerService.systemRunning()实现：
         }, UserHandle.ALL, intentFilter, null, mLocationHandler);
     }
 ```
+
 在loadProvidersLocked()函数中会初始化GpsLocationProvider，并将其缓存到mProviders中，updateProvidersLocked()函数会根据设置启用对应的LocationProvider。最终会通过GpsLocationProvider的enable()函数调用到native_init()。
 
 native_init()在JNI实现中对应android_location_GpsLocationProvider_init函数：
+
 ```c
 // frameworks/base/services/jni/com_android_server_location_GpsLocationProvider.cpp
 
@@ -330,6 +345,7 @@ static jboolean android_location_GpsLocationProvider_init(JNIEnv* env, jobject o
     return true;
 }
 ```
+
 在上述实现中调用了GpsInterface->init函数，将GpsCallbacks赋值给GpsInterface，这样gps数据就能通过回调返回给上层应用。
 
 |  HAL   |     JNI                 |   java  |
@@ -344,8 +360,8 @@ static jboolean android_location_GpsLocationProvider_init(JNIEnv* env, jobject o
 |        |create_thread_callback   |NA|
 |        |request_utc_time_callback|requestUtcTime|
 
-
 ### 上报数据
+
 ```c
 // device/softwinner/t3-common/hardware/gps/gps.c
 static int
