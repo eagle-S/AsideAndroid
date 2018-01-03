@@ -1,4 +1,4 @@
-[DOC]
+[TOC]
 
 ### framework接口
 - 代码：frameworks/base/media/java/android/media/
@@ -42,11 +42,11 @@
 - 编译：mmm -B external/tinyalsa
 - 输出：/system/lib/libtinyalsa.so
 
-![image](/Image/audio/ape_fwk_audio.png)
+![image](/images/audio/ape_fwk_audio.png)
 来源:androidhttps://source.android.com/devices/audio/?hl=zh-cn
 
-![image](/Image/audio/audio_fwk1.png)
-![image](/Image/audio/audio_fwk2.png)
+![image](/images/audio/audio_fwk1.png)
+![image](/images/audio/audio_fwk2.png)
 来源：https://source.android.com/devices/audio/?hl=zh-cn
 
 
