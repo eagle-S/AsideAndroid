@@ -1,7 +1,13 @@
+# 硬件抽象层 (HAL)
+
 [TOC]
 
-## 硬件抽象层 (HAL)
-### HAL简介
+## 相关代码
+
+- hardware/libhardware/include/hardware/hardware.h 
+- hardware/libhardware/hardware.c
+
+## HAL简介
 
 HAL的全称是Hardware Abstraction Layer,即硬件抽象层。
 
@@ -14,11 +20,12 @@ Android的HAL是为了保护一些硬件提供商的知识产权而提出的，�
 2. KERNEL DRIVER涉及到GPL的版权。某些设备制造商并不原因公开硬件驱动，所以才去用HAL方式绕过GPL。
 3. 针对某些硬件，Android有一些特殊的需求.
 
-### HAL接口介绍
+## HAL接口介绍
 
 为了保证 HAL 具有可预测的结构，每个特定于硬件的 HAL 接口都要具有 hardware/libhardware/include/hardware/hardware.h 中定义的属性。这类接口可让 Android 系统以一致的方式加载 HAL 模块的正确版本。HAL 接口包含两个组件：模块和设备。
 
-#### HAL模块
+### HAL模块
+
 ```c
 // hardware/libhardware/include/hardware/hardware.h 
 typedef struct hw_module_t {
@@ -87,6 +94,7 @@ typedef struct hw_module_t {
 
 } hw_module_t;
 ```
+
 表示模块的结构体 hw_module_t，其中包含：
 - tag 标签，值必须为HARDWARE_MODULE_TAG
 - version_major 主版本号
@@ -97,6 +105,7 @@ typedef struct hw_module_t {
 - methods  结构体 hw_module_methods_t 的指针
 
 hw_module_t 结构体还包含指向另一个结构体 hw_module_methods_t 的指针，这个结构体中包含一个指向相应模块的 open 函数的指针。此 open 函数用于与相关硬件建立通信。
+
 ```c
 typedef struct hw_module_methods_t {
     /** Open a specific device */
@@ -107,6 +116,7 @@ typedef struct hw_module_methods_t {
 ```
 
 实际使用中每个特定硬件的 HAL 通常都会使用附加信息为该特定硬件扩展通用的 hw_module_t 结构体。但必须保证hw_module_t处于此结体的第一个位置，即处于处于结构体的首地址的位置，在相机 HAL 中，camera_module_t 结构体会包含一个 hw_module_t 结构体以及其他特定于相机的函数指针：
+
 ```c
 typedef struct camera_module {
     hw_module_t common;
@@ -116,6 +126,7 @@ typedef struct camera_module {
 ```
 
 实现 HAL 并创建模块结构体时，必须将其命名为 HAL_MODULE_INFO_SYM， HAL_MODULE_INFO_SYM在hardware/libhardware/include/hardware/hardware.h中定义，此为寻找hw_module_t模块首地址标志。
+
 ```c
 /**
  * Name of the hal_module_info
@@ -129,6 +140,7 @@ typedef struct camera_module {
 ```
 
 HAL模块定义举例：
+
 ```c
 struct audio_module HAL_MODULE_INFO_SYM = {
     .common = {
@@ -143,11 +155,12 @@ struct audio_module HAL_MODULE_INFO_SYM = {
 };
 ```
 
-#### HAL设备
+### HAL设备
 
 设备是产品硬件的抽象表示。例如，一个音频模块可能包含主音频设备、USB 音频设备或蓝牙 A2DP 音频设备。
 
 设备由 hw_device_t 结构体表示。
+
 ```c
 // hardware/libhardware/include/hardware/hardware.h 
 
@@ -207,13 +220,14 @@ struct audio_hw_device {
 typedef struct audio_hw_device audio_hw_device_t;
 ```
 
-### HAL加载
+## HAL加载
 
 HAL加载具体实现在hardware/libhardware/hardware.c文件中
 
-#### 加载HAL模块，获取hw_module_t
+### 加载HAL模块，获取hw_module_t
 
 加载HAL模块使用hardware中hw_get_module或hw_get_module_by_class函数：
+
 ``` c
 // hardware/libhardware/hardware.c
 
@@ -278,6 +292,7 @@ int hw_get_module_by_class(const char *class_id, const char *inst,
     return status;
 }
 ```
+
 1. 获取模块名称name，name由传入的参数char *class_id, char *inst组成，如果inst为null则name=class_id，否则name=class_id.inst
 2. 在特定目录下，查找变体so共享库，获取其路径path
 
@@ -286,7 +301,9 @@ int hw_get_module_by_class(const char *class_id, const char *inst,
 #define HAL_LIBRARY_PATH1 "/system/lib/hw"
 #define HAL_LIBRARY_PATH2 "/vendor/lib/hw"
 ```
+
 so库查找路径有两个，且/vendor/lib/hw 优先级大于/system/lib/hw
+
 ```c
 /**
  * There are a set of variant filename for modules. The form of the filename
@@ -307,9 +324,11 @@ static const char *variant_keys[] = {
     "ro.arch"
 };
 ```
+
 每个模块可能有一系列变体名，变体名格式为<MODULE_ID>.variant.so，例如MODULE_ID=led时，变体名可能是led.trout.so、led.msm7k.so。变体值根据系统属性"ro.product.board", "ro.board.platform" and "ro.arch" 依次获取。如果这些属性获取不到值，则查找<MODULE_ID>.default.so
 
 查找路径及变体so库名称最终组装成path，传入到load函数中
+
 ```c
 /**
  * Load the file defined by the variant and if successful
@@ -375,24 +394,28 @@ static int load(const char *id,
     return status;
 }
 ```
+
 1. 调用handle = dlopen(path, RTLD_NOW)根据path路径打开so文件
 2. 调用hmi = (struct hw_module_t *)dlsym(handle, sym)，根据HAL_MODULE_INFO_SYM_AS_STR字符串"HMI"获取hw_module_t地址
 
+### 获取hw_device_t
 
-#### 获取hw_device_t
 在获取hw_module_t地址后，hw_module_t中函数指针地址也被初始化。再调用open函数时对hw_device_t进行赋值
 
-### 寻找hw_module_t首地址
-```
+## 寻找hw_module_t首地址
+
+```shell
 linux@ubuntu:~/eclair_2.1_farsight/out/target/product/fs100/system/lib/hw$ file led.default.so   
 led.default.so: ELF 32-bit LSB shared object, ARM, version 1 (SYSV), dynamically linked, stripped 
 ```
+
 使用file命令查看so文件，会发现so是以ELF头开始的文件。
 
 ELF = Executable and Linkable Format，可执行连接格式，是UNIX系统实验室（USL）作为应用程序二进制接口（Application Binary Interface，ABI）而开发和发布的，扩展名为elf。它保存了路线图(road map)，描述了该文件的组织情况。sections保存着object 文件的信息，从连接角度看：包括指令，数据,符号表，重定位信息等等。
 
 可以使用readelf命令进一步查看相应的符号信息
-```
+
+```shell
 linux@ubuntu:~/eclair_2.1_farsight/out/target/product/fs100/system/lib/hw$ readelf -s led.default.so 
 
 Symbol table '.dynsym' contains 25 entries:
@@ -423,11 +446,10 @@ Symbol table '.dynsym' contains 25 entries:
     23: 00000000     0 FUNC    GLOBAL DEFAULT  UND close
     24: 00000000     0 FUNC    GLOBAL DEFAULT  UND free
 ```
+
 在21行我们发现，名字就是“HMI”，对应于hw_module_t结构体。
 
 所以在定义硬件模块时必须使用HAL_MODULE_INFO_SYM为变量名，这样编译器才会将这个结构体的导出符号变为“HMI”，这样这个结构体才能被dlsym函数找到！
-
-
 
 参考：
 
@@ -446,3 +468,5 @@ http://blog.csdn.net/myarrow/article/details/7175204
 Android HAL的被调用流程
 http://blog.csdn.net/myarrow/article/details/7175714
 
+ Android逆向之旅---SO(ELF)文件格式详解
+ http://blog.csdn.net/jiangwei0910410003/article/details/49336613
