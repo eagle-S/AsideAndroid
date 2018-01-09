@@ -1,3 +1,6 @@
+android系统从init进程开始到systemserver启动详细流程
+https://wenku.baidu.com/view/1a41983d76a20029bc642daa
+
 Android启动过程深入解析
 http://blog.jobbole.com/67931/
 
