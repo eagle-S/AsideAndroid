@@ -17,3 +17,62 @@ java.lang.RuntimeException: here
         at android.os.Binder.execTransact(Binder.java:404)
         at dalvik.system.NativeStart.run(Native Method)
 ```
+
+
+```
+boot_progress_start: 3401
+boot_progress_preload_start: 4214
+boot_progress_preload_end: 5601
+boot_progress_system_run: 5725
+boot_progress_pms_start: 5860
+boot_progress_pms_system_scan_start: 6083
+boot_progress_pms_data_scan_start: 6973
+boot_progress_pms_scan_end: 6974
+boot_progress_pms_ready: 7074
+boot_progress_ams_ready: 7814
+boot_progress_enable_screen: 11408
+SurfaceFlinger: Total boot time is (11704 ms)
+```
+
+打印代码位置：
+boot_progress_start
+init.c ->  app_main.main  -> AndroidRuntime.start
+LOG_EVENT_LONG(LOG_BOOT_PROGRESS_START, ns2ms(systemTime(SYSTEM_TIME_MONOTONIC)));
+
+
+boot_progress_preload_start
+boot_progress_preload_end
+ZygoteInit.main
+EventLog.writeEvent(LOG_BOOT_PROGRESS_PRELOAD_START, SystemClock.uptimeMillis());
+preload();			
+EventLog.writeEvent(LOG_BOOT_PROGRESS_PRELOAD_END, SystemClock.uptimeMillis());
+
+
+boot_progress_system_run
+SystemServer.initAndLoop
+EventLog.writeEvent(EventLogTags.BOOT_PROGRESS_SYSTEM_RUN,
+            SystemClock.uptimeMillis());
+
+boot_progress_pms_start
+boot_progress_pms_system_scan_start
+boot_progress_pms_data_scan_start
+boot_progress_pms_scan_end
+boot_progress_pms_ready
+PackageManagerService.new
+EventLog.writeEvent(EventLogTags.BOOT_PROGRESS_PMS_START, SystemClock.uptimeMillis());
+EventLog.writeEvent(EventLogTags.BOOT_PROGRESS_PMS_SYSTEM_SCAN_START, startTime);
+EventLog.writeEvent(EventLogTags.BOOT_PROGRESS_PMS_DATA_SCAN_START, SystemClock.uptimeMillis());
+EventLog.writeEvent(EventLogTags.BOOT_PROGRESS_PMS_SCAN_END, SystemClock.uptimeMillis());
+EventLog.writeEvent(EventLogTags.BOOT_PROGRESS_PMS_READY, SystemClock.uptimeMillis());
+
+boot_progress_ams_ready
+ActivityManagerService.systemReady
+EventLog.writeEvent(EventLogTags.BOOT_PROGRESS_AMS_READY, SystemClock.uptimeMillis());
+
+boot_progress_enable_screen
+ActivityManagerService.enableScreenAfterBoot
+EventLog.writeEvent(EventLogTags.BOOT_PROGRESS_ENABLE_SCREEN, SystemClock.uptimeMillis());
+
+Total boot time is (11704 ms)
+SurfaceFlinger.bootFinished
+ALOGI("Total boot time is (%ld ms)", long(ns2ms(now)) );
