@@ -18,8 +18,40 @@ java.lang.RuntimeException: here
         at dalvik.system.NativeStart.run(Native Method)
 ```
 
-
+开机广播，调用栈：
 ```
+finishBooting
+java.lang.RuntimeException: here
+      at com.android.server.am.ActivityManagerService.finishBooting(ActivityManagerService.java:5458)
+      at com.android.server.am.ActivityStackSupervisor.activityIdleInternalLocked(ActivityStackSupervisor.java:1920)
+      at com.android.server.am.ActivityManagerService.activityIdle(ActivityManagerService.java:5336)
+      at android.app.ActivityManagerNative.onTransact(ActivityManagerNative.java:409)
+      at com.android.server.am.ActivityManagerService.onTransact(ActivityManagerService.java:2129)
+      at android.os.Binder.execTransact(Binder.java:404)
+      at dalvik.system.NativeStart.run(Native Method)
+```
+
+```java
+//  frameworks/base/services/java/com/android/server/am/ActivityStackSupervisor.java
+    final ActivityRecord activityIdleInternalLocked(final IBinder token, boolean fromTimeout,
+            Configuration config) {
+        .............
+
+        if (booting) {
+            mService.finishBooting();
+        } else if (startingUsers != null) {
+            for (int i = 0; i < startingUsers.size(); i++) {
+                mService.finishUserSwitch(startingUsers.get(i));
+            }
+        }
+
+        mService.trimApplications();
+
+        if (enableScreen) {
+            mService.enableScreenAfterBoot();
+        }
+```
+
 boot_progress_start: 3401
 boot_progress_preload_start: 4214
 boot_progress_preload_end: 5601
