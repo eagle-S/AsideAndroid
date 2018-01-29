@@ -386,6 +386,7 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
 }
 
 ```
+
 AudioPolicyManagerBase对象构造过程中主要完成以下几个步骤：
 1. 加载audio_policy.conf配置文件:loadAudioPolicyConfig(AUDIO_POLICY_CONFIG_FILE)
 2. 初始化各种音频流对应的音量调节点:initializeVolumeCurves()
@@ -394,6 +395,7 @@ AudioPolicyManagerBase对象构造过程中主要完成以下几个步骤：
 5. 保存输出设备描述符对象：addOutput(output, outputDesc);
 
 ##### 加载audio_policy.conf配置文件
+
 ```c
 #define AUDIO_POLICY_CONFIG_FILE "/system/etc/audio_policy.conf"
 #define AUDIO_POLICY_VENDOR_CONFIG_FILE "/vendor/etc/audio_policy.conf"
@@ -405,6 +407,7 @@ if (loadAudioPolicyConfig(AUDIO_POLICY_VENDOR_CONFIG_FILE) != NO_ERROR) {
         }
     }
 ```
+
 audio_policy.conf优先加载/vendor/etc/audio_policy.conf，如果加载失败再加载/system/etc/audio_policy.conf，如果均加载失败则会加载一个默认的HwModule，并命名为primary module，从这可以看出，音频系统中一定必须存在的module就是primary了。
 
 ##### audio_policy.conf介绍
@@ -626,6 +629,7 @@ audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
 
 }
 ```
+
 此函数主要做了一下事情：
 1. 函数首先加载系统定义的音频接口对应的so库，并打开该音频接口的抽象硬件设备audio_hw_device_t
 2. 设置音频模块主音量
@@ -634,8 +638,8 @@ audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
 此函数返回了音频设备唯一id，赋值给AudioPolicyManagerBase中的mHwModules，这样使得配置项与每个设备接口真正的对应了起来
 mHwModules[i]->mHandle = mpClientInterface->loadHwModule(mHwModules[i]->mName);
 
-
 load_audio_interface加载各音频模块，初始化audio_hw_device_t
+
 ```c
 static int load_audio_interface(const char *if_name, audio_hw_device_t **dev)
 {
@@ -666,6 +670,7 @@ out:
     return rc;
 }
 ```
+
 此处加载各种音频设备与之前的一致。
 
 ##### 打开attached_output_devices输出
@@ -673,6 +678,7 @@ out:
 获取全局配置中attached_output_devices 配置的devices，与mHwModules中mOutputProfiles匹配，如果匹配到且outProfile->mFlags不为AUDIO_OUTPUT_FLAG_DIRECT时，将会打开输出
 
 打开输出：
+
 ```c
 // hardware/libhardware_legacy/audio/AudioPolicyManagerBase.cpp
     audio_io_handle_t output = mpClientInterface->openOutput(
@@ -684,7 +690,9 @@ out:
                                     &outputDesc->mLatency,
                                     outputDesc->mFlags);
 ```
+
 最终调用到AudioFlinger.openOutput
+
 ```c
 audio_io_handle_t AudioFlinger::openOutput(audio_module_handle_t module,
                                            audio_devices_t *pDevices,
@@ -797,6 +805,7 @@ audio_io_handle_t AudioFlinger::openOutput(audio_module_handle_t module,
     return 0;
 } 
 ```
+
 1. 查找对应的音频接口设备audio_hw_device_t
 2. 初始化音频输出流对象audio_stream_out_t
 3. 将AudioHwDevice及audio_stream_out_t封装成AudioStreamOut
