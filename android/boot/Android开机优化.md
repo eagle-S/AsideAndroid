@@ -14,10 +14,11 @@
    - init.rc
 - Zygote
    - createVm
-   - preloadClasses
-   - preloadResources
-   - preloadOpenGL
-   - preloadSharedLibraries
+   - preload
+     - preloadClasses
+     - preloadResources
+     - preloadOpenGL
+     - preloadSharedLibraries
 - SystemServer
    - 
 - Launcher
