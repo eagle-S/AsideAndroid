@@ -816,3 +816,94 @@ audio_io_handle_t AudioFlinger::openOutput(audio_module_handle_t module,
 
 
 
+### 其他
+
+#### 查找对应的音频输出设备
+
+[hardware/libhardware_legacy/audio/AudioPolicyManagerBase.cpp]
+
+```java
+audio_io_handle_t AudioPolicyManagerBase::getOutput(AudioSystem::stream_type stream,
+                                    uint32_t samplingRate,
+                                    uint32_t format,
+                                    uint32_t channelMask,
+                                    AudioSystem::output_flags flags,
+                                    const audio_offload_info_t *offloadInfo)
+{
+    audio_io_handle_t output = 0;
+    uint32_t latency = 0;
+    routing_strategy strategy = getStrategy((AudioSystem::stream_type)stream);
+    audio_devices_t device = getDeviceForStrategy(strategy, false /*fromCache*/);
+
+    .........
+
+    IOProfile *profile = NULL;
+    if (((flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) == 0) ||
+            !isNonOffloadableEffectEnabled()) {
+        profile = getProfileForDirectOutput(device,
+                                           samplingRate,
+                                           format,
+                                           channelMask,
+                                           (audio_output_flags_t)flags);
+    }
+
+    ..........
+
+        outputDesc = new AudioOutputDescriptor(profile);
+        outputDesc->mDevice = device;
+        outputDesc->mSamplingRate = samplingRate;
+        outputDesc->mFormat = (audio_format_t)format;
+        outputDesc->mChannelMask = (audio_channel_mask_t)channelMask;
+        outputDesc->mLatency = 0;
+        outputDesc->mFlags =(audio_output_flags_t) (outputDesc->mFlags | flags);
+        outputDesc->mRefCount[stream] = 0;
+        outputDesc->mStopTime[stream] = 0;
+        outputDesc->mDirectOpenCount = 1;
+        output = mpClientInterface->openOutput(profile->mModule->mHandle,
+                                        &outputDesc->mDevice,
+                                        &outputDesc->mSamplingRate,
+                                        &outputDesc->mFormat,
+                                        &outputDesc->mChannelMask,
+                                        &outputDesc->mLatency,
+                                        outputDesc->mFlags,
+                                        offloadInfo);
+
+         .................
+        return output;
+    }
+```
+
+1. 根据音频类型得到播放策略Strategy
+
+    enum routing_strategy {
+            STRATEGY_MEDIA,
+            STRATEGY_PHONE,
+            STRATEGY_SONIFICATION,
+            STRATEGY_SONIFICATION_RESPECTFUL,
+            STRATEGY_DTMF,
+            STRATEGY_ENFORCED_AUDIBLE,
+            STRATEGY_EXTERNAL,
+            NUM_STRATEGIES
+        };
+
+2. 根据播放策略Strategy找到音频的设备id
+
+    AUDIO_DEVICE_OUT_EARPIECE                  = 0x1,
+    AUDIO_DEVICE_OUT_SPEAKER                   = 0x2,
+    AUDIO_DEVICE_OUT_WIRED_HEADSET             = 0x4,
+    AUDIO_DEVICE_OUT_WIRED_HEADPHONE           = 0x8,
+    AUDIO_DEVICE_OUT_BLUETOOTH_SCO             = 0x10,
+    AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET     = 0x20,
+    AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT      = 0x40,
+    AUDIO_DEVICE_OUT_BLUETOOTH_A2DP            = 0x80,
+    AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES = 0x100,
+    AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER    = 0x200,
+    AUDIO_DEVICE_OUT_AUX_DIGITAL               = 0x400,
+    AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET         = 0x800,
+    AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET         = 0x1000,
+    AUDIO_DEVICE_OUT_USB_ACCESSORY             = 0x2000,
+    AUDIO_DEVICE_OUT_USB_DEVICE                = 0x4000,
+    AUDIO_DEVICE_OUT_REMOTE_SUBMIX             = 0x8000,
+    AUDIO_DEVICE_OUT_EXTERNAL                  = 0x10000,
+
+3. 再根据device, samplingRate,format, channelMask,flags 从audio_policy.conf中匹配，找到合适的设备
