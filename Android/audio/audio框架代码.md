@@ -43,11 +43,11 @@
 - 输出：/system/lib/libtinyalsa.so
 
 ![image](/images/audio/ape_fwk_audio.png)
-来源:androidhttps://source.android.com/devices/audio/?hl=zh-cn
+来源:https://source.android.com/devices/audio/?hl=zh-cn
 
 ![image](/images/audio/audio_fwk1.png)
 ![image](/images/audio/audio_fwk2.png)
-来源：https://source.android.com/devices/audio/?hl=zh-cn
+来源：http://blog.csdn.net/yangwen123/article/details/39502689
 
 
 Android系统Audio框架介绍
