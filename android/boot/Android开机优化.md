@@ -20,9 +20,11 @@
      - preloadOpenGL
      - preloadSharedLibraries
 - SystemServer
-   - 
+   - PackageManagerService
+   - ActivityManagerService
 - Launcher
 - bootanimation
+   
 
 ### Bootloader启动
 
@@ -34,11 +36,17 @@
 
 ### SystemServer
 
+SystemServer
+
 ### Launcher启动
 
 ### bootanimation流程
 
 ## 启动时间测量
+
+### bootchart
+
+### log
 
 ## 优化实施
 
