@@ -6,17 +6,43 @@
 
 ## Android原生音频焦点实现
 
-Android使用栈来管理音频焦点，请求焦点会涉及到入栈操作，释放焦点涉及到出栈操作。
+Android机器上会装有各种五法八门的应用，并且可能会有多种应用程序会播放音频，比如播放音乐、视频，或收音机、闹铃、电话铃声等。当音频之间交互时应当有统一的交互规则，否则机器中各种声音混杂在一起不受控制，是让人极其厌恶的体验。为此Android系统提供了统一交互方式，使用音频焦点来进行统一管理。
 
-### 相关知识点
+正常的音频间交互场景：
+收音机开始播放音乐暂停，收音机退出后音乐开始继续播放
+导航播报时后台音乐暂停或降低音量，播报完毕后后台音乐继续播放或升高音量播放
 
-主要涉及到两个函数：
+音频焦点的作用即是协助各应用间音频状态的交互。
+
+1. 请求音频焦点，其他应用失去焦点
+2. 请求音频焦点，其他应用失去焦点，可以继续播放，但需要减小音量
+3. 请求音频焦点，其他应用无法获取焦点
+
+### 接口介绍
+
+> 相关代码：
+> frameworks/base/media/java/android/media/AudioManager.java
+> frameworks/base/media/java/android/media/AudioService.java
+> frameworks/base/media/java/android/media/MediaFocusControl.java
+
+AudioManager为客户端接口
+AudioService为服务端
+MediaFocusControl音频焦点管理类，使用栈来管理音频焦点，在请求和释放焦点焦点时会响应进行入栈和出栈操作
+
+AudioManager中接口函数：
 1. 请求焦点 requestAudioFocus(OnAudioFocusChangeListener l, int streamType, int durationHint)
 2. 释放焦点 abandonAudioFocus(OnAudioFocusChangeListener l)
 
 参数简介：
+OnAudioFocusChangeListener l  音频焦点改变监听，用于监听音频焦点状态变化。
 
-l  音频焦点改变监听，用于监听音频焦点状态变化，也用于标识请求id，同一个进程中只要OnAudioFocusChangeListener是不同对象，其生成的id就不同
+```java
+    public interface OnAudioFocusChangeListener {
+        public void onAudioFocusChange(int focusChange);
+    }
+```
+
+l也用于标识请求id，同一个进程中只要是不同的OnAudioFocusChangeListener对象，其生成的id就不同，即同一个应用内也可以相互之间抢焦点
 
 ``` java
     private String getIdForAudioFocusListener(OnAudioFocusChangeListener l) {
@@ -110,10 +136,10 @@ AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE 临时获取焦点，此时系统在此状�
 
 从代码中可以看出音频焦点请求会封装成FocusRequester对象保存在mFocusStack栈中。
 
-1. 首先判断栈顶FocusRequester和请求的clientId是不是同一个clientId和状态
-2. 然后移除栈中相同clientId的FocusRequester
+1. 判断栈顶FocusRequester和请求的clientId是不是同一个clientId和状态，完全相同则表示获取成功，否则移除栈顶数据
+2. 移除栈中相同clientId的FocusRequester
 3. 通知栈中剩余FocusRequester状态改变
-4. 将最新音频焦点请求入栈
+4. 将最新音频焦点请求对象入栈
 
 第2步移除栈中相同clientId的FocusRequester
 
@@ -321,18 +347,32 @@ signal 表示移除栈顶数据后要不要通知下一个数据获取焦点。�
 音频通道切换场景：
 在请求焦点的同时切换通道，如果第三方音频发声需要特殊通道，在第三方请求焦点时帮其切换通道。或在第三方提供的播放、暂停接口中切换通道
 
-#### 应用调用
+#### SDK目前实现
 
-使用Android原生口：requestAudioFocus、abandonAudioFocus， 在requestAudioFocus成功后处理切源
-（替换掉源进、源出、事件进、事件出处理）
+SDK将能发声的应用定义为不同的音源，车机上的一些需要静音的特殊操作（例如倒车）定义为事件。 源分两种动作：源进、源出。事件也分两种：事件进、事件出。应用需注册监听源进、源出、事件进、事件出等状态。
 
-注意：抢音频焦点和切源同时进行
+sdkservice会解析MCU发送sdk的数据，也会解析应用调用sdk发送给MCU的数据，判断是源相关的操作，会回调给各应用的sdk接口，各应用sdk会根据当前源和上次的源来判断是否回调给各应用处理。各应用在回调中处理音频的播放和暂停状态
+
+优点：逻辑比较独立，方便移植；接口中传递源和事件的种类，应用可以做更细致的逻辑处理
+缺点：与android音频焦点切换不兼容，不能与第三方音频焦点进行交互；切换音频通道与音频焦点两种逻辑混在了一起
+
+#### 新方案实现
+
+使用Android原生音频焦点逻辑，将原车事件转换为抢焦点方式与应用进行交互，将切源操作仅用于切换音频通道.
+
+应用实现：使用Android音频焦点接口：requestAudioFocus、abandonAudioFocus， 在requestAudioFocus成功后调用切源（用于切换通道）
+系统实现：将车机特殊事件转换为音频焦点处理，帮助第三方应用切换音频通道，实现音频交互的特殊需求（有的导航播报时会请求焦点，并在焦点丢失后中断播报，但需求不希望被中断）
 
 针对事件：蓝牙电话、倒车在sdk内部实现请求焦点和切通道操作，导航播报、语音交互仍调用sdk切通道接口，其他逻辑由sdk和frameworks内部实现
 
 蓝牙电话、倒车、语音交互请求特殊的焦点及切通道
 导航播报不抢焦点，不处理焦点丢失情况（屏蔽导航应用抢焦点操作）
 
+优点：与android原生音频焦点切换兼容，可以与第三方应用共享音频焦点逻辑；切换音频通道与音频焦点两种逻辑分开处理
+缺点：需要将事件转换为android音频焦点处理，增加逻辑复杂度；无法判断当前源或事件。
+
 ## 其他
 
-### dumpsys audio
+### 打印信息
+
+dumpsys audio命令能打印音频焦点栈中各个客户端的焦点状态
