@@ -24,7 +24,6 @@
    - ActivityManagerService
 - Launcher
 - bootanimation
-   
 
 ### Bootloader启动
 
@@ -36,9 +35,10 @@
 
 ### SystemServer
 
-SystemServer
+SystemServer启动后，会加载各种系统服务，PackageManagerService， ActivityManagerService
 
 ### Launcher启动
+
 
 ### bootanimation流程
 

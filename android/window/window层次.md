@@ -1,0 +1,5 @@
+
+界面上UI显示最终都是调用到WindowManager.addView(View view, WindowManager.LayoutParams params)方法， WindowManager.LayoutParams中type指定了window类型，也决定了window显示的层次
+
+
+WindowManager.addView方法会调用到WindowManagerService.addWindow方法。
