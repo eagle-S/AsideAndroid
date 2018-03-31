@@ -25,3 +25,7 @@ Settings/src/com/android/settings/DevelopmentSettings.java
 Settings/src/com/android/settings/applications/ProcessStatsUi.java
 Settings/src/com/android/settings/applications/ProcessStatsDetail.java
 Settings/src/com/android/settings/applications/ProcessStatsMemDetail.java
+
+设置-> 设备-存储
+
+
