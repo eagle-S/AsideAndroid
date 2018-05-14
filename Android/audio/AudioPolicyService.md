@@ -1,12 +1,15 @@
 [TOC]
 
 ## 简介
+
 AudioPolicyService处于本地媒体服务层，提供音频策略服务，比如什么时候打开音频接口设备、某种Stream类型的音频对应什么设备等等。
 
 ## AudioPolicyService启动
+
 AudioPolicyService服务运行在mediaserver进程中，随着mediaserver进程启动而启动。
 
 mediaserver启动
+
 ```c
 // frameworks/av/media/mediaserver/main_mediaserver.cpp
 
@@ -27,6 +30,7 @@ int main(int argc, char** argv)
 
 }
 ```
+
 AudioPolicyService继承了模板类BinderService，该类用于注册native service。
 
 ```c
@@ -46,11 +50,13 @@ public:
     static void instantiate() { publish(); }
 }
 ```
+
 instantiate函数的实现可以看出，向ServiceManager注册的服务，服务名根据getServiceName()获取，服务使用无参数构造函数进行初始化。
 
-##AudioPolicyService初始化
+## AudioPolicyService初始化
 
 AudioPolicyService初始化实现，如下：
+
 ```c
 static const char *getServiceName() ANDROID_API { return "media.audio_policy"; }
 
@@ -101,6 +107,7 @@ AudioPolicyService::AudioPolicyService()
     }
 }
 ```
+
 从构造函数可以看出初始化包括：
 1. 创建AudioCommandThread（ApmTone、ApmAudio、ApmOutput）
 2. 通过hw_get_module获取legacy_ap_module
@@ -110,22 +117,24 @@ AudioPolicyService::AudioPolicyService()
 
 ### 创建AudioCommandThread线程
 
-
 ### 获取legacy_ap_module
+
 详见
 
 ### 加载legacy_ap_device
+
 详见
 
 ### 创建legacy_audio_policy
+
 通过调用上一步得到的legacy_ap_device结构体的函数指针创建legacy_audio_policy
+
 ```c
 mpAudioPolicyDev->create_audio_policy(mpAudioPolicyDev, &aps_ops, this,
                                                &mpAudioPolicy);
 ```
+
 以上传入的aps_ops
-
-
 
 ```c
 // hardware/libhardware_legacy/audio/audio_policy_hal.cpp
@@ -206,17 +215,21 @@ err_new_compat_client:
 }
 
 ```
+
 创建legacy_audio_policy对象给函数指针及各成员赋值。这里赋值的同时会初始化AudioPolicyCompatClient及AudioPolicyManager
 
 #### 创建AudioPolicyCompatClient
+
 ```c
 // hardware/libhardware_legacy/audio/AudioPolicyCompatClient.h
     AudioPolicyCompatClient(struct audio_policy_service_ops *serviceOps,
                             void *service) :
             mServiceOps(serviceOps) , mService(service) {}
 ```
+
 查看hardware/libhardware_legacy/audio/AudioPolicyCompatClient.cpp的实现可以发现，AudioPolicyCompatClient是对audio_policy_service_ops的封装类，对外提供audio_policy_service_ops数据结构中定义的接口。
 而初始化传入的audio_policy_service_ops在AudioPolicyService.cpp中初始化
+
 ```c
     struct audio_policy_service_ops aps_ops = {
         open_output           : aps_open_output,
@@ -241,6 +254,7 @@ err_new_compat_client:
 ```
 
 #### 创建AudioPolicyManager
+
 ```c
 // hardware/libhardware_legacy/audio/AudioPolicyManagerDefault.h
 class AudioPolicyManagerDefault: public AudioPolicyManagerBase
@@ -261,7 +275,9 @@ extern "C" AudioPolicyInterface* createAudioPolicyManager(AudioPolicyClientInter
     return new AudioPolicyManagerDefault(clientInterface);
 }
 ```
+
 AudioPolicyManagerDefault继承于AudioPolicyManagerBase，看下AudioPolicyManagerBase初始化
+
 ```c
 AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clientInterface)
     :
@@ -297,7 +313,6 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
 
     // open all output streams needed to access attached devices
     for (size_t i = 0; i < mHwModules.size(); i++) {
-	
         mHwModules[i]->mHandle = mpClientInterface->loadHwModule(mHwModules[i]->mName);
         if (mHwModules[i]->mHandle == 0) {
             ALOGW("could not open HW module %s", mHwModules[i]->mName);
@@ -313,17 +328,17 @@ AudioPolicyManagerBase::AudioPolicyManagerBase(AudioPolicyClientInterface *clien
             if ((outProfile->mSupportedDevices & mAttachedOutputDevices) &&
                     ((outProfile->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) == 0)) {
                 AudioOutputDescriptor *outputDesc = new AudioOutputDescriptor(outProfile);
-		 if(!(strcmp(mHwModules[i]->mName, AUDIO_HARDWARE_MODULE_ID_EXTERNAL))
-		 	&& (outProfile->mSupportedDevices & AUDIO_DEVICE_OUT_EXTERNAL))
-		 {
-		     ALOGV("external devices supported, force open!");
-		     outputDesc->mDevice = AUDIO_DEVICE_OUT_EXTERNAL;
-		 }
-		 else
-		 {
-		     outputDesc->mDevice = (audio_devices_t)(mDefaultOutputDevice &
+            if(!(strcmp(mHwModules[i]->mName, AUDIO_HARDWARE_MODULE_ID_EXTERNAL))
+                 && (outProfile->mSupportedDevices & AUDIO_DEVICE_OUT_EXTERNAL))
+             {
+                 ALOGV("external devices supported, force open!");
+                 outputDesc->mDevice = AUDIO_DEVICE_OUT_EXTERNAL;
+             }
+            else
+             {
+                outputDesc->mDevice = (audio_devices_t)(mDefaultOutputDevice &
                                                             outProfile->mSupportedDevices);
-		 }
+            }
 
                 audio_io_handle_t output = mpClientInterface->openOutput(
                                                 outProfile->mModule->mHandle,
@@ -411,7 +426,9 @@ if (loadAudioPolicyConfig(AUDIO_POLICY_VENDOR_CONFIG_FILE) != NO_ERROR) {
 audio_policy.conf优先加载/vendor/etc/audio_policy.conf，如果加载失败再加载/system/etc/audio_policy.conf，如果均加载失败则会加载一个默认的HwModule，并命名为primary module，从这可以看出，音频系统中一定必须存在的module就是primary了。
 
 ##### audio_policy.conf介绍
+
 /system/etc/audio_policy.conf文件开头有对此文件介绍
+
 ```
 # Global configuration section: lists input and output devices always present on the device
 # as well as the output device selected by default.
@@ -440,6 +457,7 @@ global_configuration {
 ```
 
 在代码中每种音频硬件模块被抽象成HwModule
+
 ```c
 // hardware/libhardware_legacy/include/hardware_legacy/AudioPolicyManagerBase.h
 class HwModule {
@@ -487,9 +505,11 @@ class HwModule {
             HwModule *mModule;                     // audio HW module exposing this I/O stream
         };
 ```
+
 HwModule中包含了模块名称，输入、输入描述及int类型的mHandle
 
 audio.h中定义的音频模块名称
+
 ```c
 // hardware/libhardware/include/hardware/audio.h
 
@@ -501,6 +521,7 @@ audio.h中定义的音频模块名称
 ```
 
 加载流程如下:
+
 ```c
 status_t AudioPolicyManagerBase::loadAudioPolicyConfig(const char *path)
 {
@@ -532,13 +553,14 @@ status_t AudioPolicyManagerBase::loadAudioPolicyConfig(const char *path)
 
 待续
 
-
-
 ##### 加载各audio硬件模块
+
 ```c
 mHwModules[i]->mHandle = mpClientInterface->loadHwModule(mHwModules[i]->mName);
 ```
+
 由之前对AudioPolicyCompatClient分析可知，此处loadHwModule实际是调用了AudioFlinger的loadHwModule
+
 ```c
 audio_module_handle_t AudioFlinger::loadHwModule(const char *name)
 {
@@ -803,7 +825,7 @@ audio_io_handle_t AudioFlinger::openOutput(audio_module_handle_t module,
     }
 
     return 0;
-} 
+}
 ```
 
 1. 查找对应的音频接口设备audio_hw_device_t
@@ -813,8 +835,6 @@ audio_io_handle_t AudioFlinger::openOutput(audio_module_handle_t module,
 5. 给每个thread对应一个唯一id缓存下来mPlaybackThreads.add(id, thread);
 
 ##### 保存输出设备描述符对象
-
-
 
 ### 其他
 

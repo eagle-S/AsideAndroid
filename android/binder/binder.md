@@ -10,8 +10,15 @@ ueventd在/system/core/rootdir/init.rc启动
 
 init.rc在/system/core/init/init.c中加载
 
+## Binder是什么
 
 
+
+## Binder跨进程通信原理
+
+
+
+## Binder通信模型
 
 frameworks/base/core/java/com/android/internal/os/BinderInternal.java
 对应JNI类frameworks/base/core/jni/android_util_Binder.cpp
@@ -20,4 +27,5 @@ frameworks/base/core/java/com/android/internal/os/BinderInternal.java
 
 
 https://www.jianshu.com/p/33c96606d604
-http://gityuan.com/tags/#binder
+http://gityuan.com/tags/#
+
