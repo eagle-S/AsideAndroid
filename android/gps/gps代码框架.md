@@ -403,7 +403,7 @@ gps_state_init( GpsState*  state, GpsCallbacks* callbacks )
         return;
     }
 
-	_gps_mLocation_p=&_gps_mLocation;
+    _gps_mLocation_p=&_gps_mLocation;
     snprintf(device, sizeof(device), "/dev/%s",prop);
     do {
         state->fd = open( device, O_RDWR );
@@ -431,10 +431,6 @@ Fail:
     gps_state_done( state );
 }
 ```
-
-
-
-
 
 gps框架及简析
 http://blog.csdn.net/fantasyhujian/article/details/9262463

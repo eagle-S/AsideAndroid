@@ -4,7 +4,7 @@
 
 WindowManager.addView方法会调用到WindowManagerService.addWindow方法。
 
-WindowState获取mBaseLayer
+WindowState获取mBaseLayer：PhoneWindowManager.windowTypeToLayerLw
 
     public int windowTypeToLayerLw(int type) {
         if (type >= FIRST_APPLICATION_WINDOW && type <= LAST_APPLICATION_WINDOW) {
