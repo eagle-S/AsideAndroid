@@ -3,6 +3,17 @@ http://blog.csdn.net/luoshengyang/article/details/7691321
 http://windrunnerlihuan.com/2017/05/02/Android-SurfaceFlinger-%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%B7%AF-%E4%B8%89-Android%E5%BC%80%E6%9C%BA%E5%8A%A8%E7%94%BB%E6%B5%81%E7%A8%8B%E7%AE%80%E8%BF%B0/
 
 
+单独启动开机动画：
+setprop  service.bootanim.exit 0 
+setprop ctl.start bootanim 
+结束开机动画：
+setprop  service.bootanim.exit 1 
+
+
+logcat -b events -b main -b system -v threadtime| grep -E "boot|BootAnimation|awplayer"  & 
+
+
+
 开机速度受launcher启动速度影响
 
 在启动的第一个activity处于Idle状态时才会去结束开机动画，调用栈：
