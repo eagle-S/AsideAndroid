@@ -1,0 +1,70 @@
+01-01 02:44:58.880  1780  1851 E PhoneWindowManager: java.lang.Exception
+01-01 02:44:58.880  1780  1851 E PhoneWindowManager:    at com.android.internal.policy.impl.PhoneWindowManager._interceptKeyBeforeDispatching(PhoneWindowManager.java:2745)
+01-01 02:44:58.880  1780  1851 E PhoneWindowManager:    at com.android.internal.policy.impl.PhoneWindowManager.interceptKeyBeforeDispatching(PhoneWindowManager.java:2726)
+01-01 02:44:58.880  1780  1851 E PhoneWindowManager:    at com.android.server.wm.InputMonitor.interceptKeyBeforeDispatching(InputMonitor.java:374)
+01-01 02:44:58.880  1780  1851 E PhoneWindowManager:    at com.android.server.input.InputManagerService.interceptKeyBeforeDispatching(InputManagerService.java:1360)
+01-01 02:44:58.880  1780  1851 E PhoneWindowManager:    at dalvik.system.NativeStart.run(Native Method)
+
+01-01 03:50:03.080  1928  1928 E ViewRootImpl: deliverInputEvent
+01-01 03:50:03.080  1928  1928 E ViewRootImpl: java.lang.Exception
+01-01 03:50:03.080  1928  1928 E ViewRootImpl:  at android.view.ViewRootImpl.deliverInputEvent(ViewRootImpl.java:5627)
+01-01 03:50:03.080  1928  1928 E ViewRootImpl:  at android.view.ViewRootImpl.doProcessInputEvents(ViewRootImpl.java:5614)
+01-01 03:50:03.080  1928  1928 E ViewRootImpl:  at android.view.ViewRootImpl.enqueueInputEvent(ViewRootImpl.java:5585)
+01-01 03:50:03.080  1928  1928 E ViewRootImpl:  at android.view.ViewRootImpl$WindowInputEventReceiver.onInputEvent(ViewRootImpl.java:5737)
+01-01 03:50:03.080  1928  1928 E ViewRootImpl:  at android.view.InputEventReceiver.dispatchInputEvent(InputEventReceiver.java:185)
+01-01 03:50:03.080  1928  1928 E ViewRootImpl:  at android.os.MessageQueue.nativePollOnce(Native Method)
+01-01 03:50:03.080  1928  1928 E ViewRootImpl:  at android.os.MessageQueue.next(MessageQueue.java:138)
+01-01 03:50:03.080  1928  1928 E ViewRootImpl:  at android.os.Looper.loop(Looper.java:123)
+01-01 03:50:03.080  1928  1928 E ViewRootImpl:  at android.app.ActivityThread.main(ActivityThread.java:5017)
+01-01 03:50:03.080  1928  1928 E ViewRootImpl:  at java.lang.reflect.Method.invokeNative(Native Method)
+01-01 03:50:03.080  1928  1928 E ViewRootImpl:  at java.lang.reflect.Method.invoke(Method.java:515)
+01-01 03:50:03.080  1928  1928 E ViewRootImpl:  at com.android.internal.os.ZygoteInit$MethodAndArgsCaller.run(ZygoteInit.java:834)
+01-01 03:50:03.080  1928  1928 E ViewRootImpl:  at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:650)
+01-01 03:50:03.080  1928  1928 E ViewRootImpl:  at dalvik.system.NativeStart.main(Native Method)
+
+
+
+01-01 03:50:03.120  2350  2350 D ViewRootImpl: deliver input :android.view.ViewRootImpl$EarlyPostImeInputStage@42710c48
+01-01 03:50:03.120  2350  2350 D ViewRootImpl: deliver input :android.view.ViewRootImpl$NativePostImeInputStage@42710aa0
+01-01 03:50:03.120  2350  2350 D ViewRootImpl: deliver input :android.view.ViewRootImpl$ViewPostImeInputStage@42710a88
+01-01 03:50:03.120  2350  2350 D ViewRootImpl: deliver input :android.view.ViewRootImpl$SyntheticInputStage@42710900
+
+
+
+01-01 03:56:03.260  1928  1928 D ViewRootImpl: deliver input :android.view.ViewRootImpl$SyntheticInputStage@431a6d60
+01-01 03:56:03.260  1791  1862 E PhoneWindowManager: _interceptKeyBeforeDispatching
+01-01 03:56:03.260  1791  1862 E PhoneWindowManager: java.lang.Exception
+01-01 03:56:03.260  1791  1862 E PhoneWindowManager:    at com.android.internal.policy.impl.PhoneWindowManager._interceptKeyBeforeDispatching(PhoneWindowManager.java:2745)
+01-01 03:56:03.260  1791  1862 E PhoneWindowManager:    at com.android.internal.policy.impl.PhoneWindowManager.interceptKeyBeforeDispatching(PhoneWindowManager.java:2726)
+01-01 03:56:03.260  1791  1862 E PhoneWindowManager:    at com.android.server.wm.InputMonitor.interceptKeyBeforeDispatching(InputMonitor.java:374)
+01-01 03:56:03.260  1791  1862 E PhoneWindowManager:    at com.android.server.input.InputManagerService.interceptKeyBeforeDispatching(InputManagerService.java:1360)
+01-01 03:56:03.260  1791  1862 E PhoneWindowManager:    at dalvik.system.NativeStart.run(Native Method)
+01-01 03:56:03.260  1791  1862 D PhoneWindowManager: interceptKeyTi keyCode=4 down=true repeatCount=0 keyguardOn=true mHomePressed=false canceled=false
+01-01 03:56:03.260  1791  1862 D PhoneWindowManager: isFactoryConfigExist retval = false
+01-01 03:56:03.260  1791  1862 D PhoneWindowManager: keycode is 4 , and POWER is 26
+01-01 03:56:03.260  1928  1928 D PanelHolder: onMeasure(): measured width = 1280, measured height = 76
+01-01 03:56:03.260  2350  2350 E ViewRootImpl: deliverInputEvent
+01-01 03:56:03.260  2350  2350 E ViewRootImpl: java.lang.Exception
+01-01 03:56:03.260  2350  2350 E ViewRootImpl:  at android.view.ViewRootImpl.deliverInputEvent(ViewRootImpl.java:5627)
+01-01 03:56:03.260  2350  2350 E ViewRootImpl:  at android.view.ViewRootImpl.doProcessInputEvents(ViewRootImpl.java:5614)
+01-01 03:56:03.260  2350  2350 E ViewRootImpl:  at android.view.ViewRootImpl.enqueueInputEvent(ViewRootImpl.java:5585)
+01-01 03:56:03.260  2350  2350 E ViewRootImpl:  at android.view.ViewRootImpl$WindowInputEventReceiver.onInputEvent(ViewRootImpl.java:5737)
+01-01 03:56:03.260  2350  2350 E ViewRootImpl:  at android.view.InputEventReceiver.dispatchInputEvent(InputEventReceiver.java:185)
+01-01 03:56:03.260  2350  2350 E ViewRootImpl:  at android.os.MessageQueue.nativePollOnce(Native Method)
+01-01 03:56:03.260  2350  2350 E ViewRootImpl:  at android.os.MessageQueue.next(MessageQueue.java:138)
+01-01 03:56:03.260  2350  2350 E ViewRootImpl:  at android.os.Looper.loop(Looper.java:123)
+01-01 03:56:03.260  2350  2350 E ViewRootImpl:  at android.app.ActivityThread.main(ActivityThread.java:5017)
+01-01 03:56:03.260  2350  2350 E ViewRootImpl:  at java.lang.reflect.Method.invokeNative(Native Method)
+01-01 03:56:03.260  2350  2350 E ViewRootImpl:  at java.lang.reflect.Method.invoke(Method.java:515)
+01-01 03:56:03.260  2350  2350 E ViewRootImpl:  at com.android.internal.os.ZygoteInit$MethodAndArgsCaller.run(ZygoteInit.java:834)
+01-01 03:56:03.260  2350  2350 E ViewRootImpl:  at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:650)
+01-01 03:56:03.260  2350  2350 E ViewRootImpl:  at dalvik.system.NativeStart.main(Native Method)
+01-01 03:56:03.260  1928  1928 D PanelHolder: onMeasure(): width mode = 1073741824, height mode = 1073741824
+01-01 03:56:03.260  2350  2350 D ViewRootImpl: deliver input :android.view.ViewRootImpl$NativePreImeInputStage@42710dc0
+01-01 03:56:03.260  2350  2350 D ViewRootImpl: deliver input :android.view.ViewRootImpl$ViewPreImeInputStage@42710da8
+01-01 03:56:03.260  2350  2350 D ViewRootImpl: deliver input :android.view.ViewRootImpl$ImeInputStage@42710c60
+01-01 03:56:03.260  2350  2350 D ViewRootImpl: deliver input :android.view.ViewRootImpl$EarlyPostImeInputStage@42710c48
+01-01 03:56:03.260  2350  2350 D ViewRootImpl: deliver input :android.view.ViewRootImpl$NativePostImeInputStage@42710aa0
+01-01 03:56:03.260  2350  2350 D ViewRootImpl: deliver input :android.view.ViewRootImpl$ViewPostImeInputStage@42710a88
+01-01 03:56:03.260  2350  2350 D ViewRootImpl: deliver input :android.view.ViewRootImpl$SyntheticInputStage@42710900
+
