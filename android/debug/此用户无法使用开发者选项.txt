@@ -1,0 +1,11 @@
+此用户无法使用开发者选项
+
+原因：
+删除了APP：packages\apps\Provision
+
+解决：
+1. 再次加上应用Provision
+
+2. 使用命令设置
+settings put global device_provisioned 1
+settings put secure user_setup_complete 1
