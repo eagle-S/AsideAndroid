@@ -20,4 +20,5 @@ audio_route_init
 路径
 
 #define AUDIO_XML_PATH "/system/etc/codec_paths.xml"
+
 #define AUDIO_XML_PATH "/system/etc/ac100_paths.xml"
